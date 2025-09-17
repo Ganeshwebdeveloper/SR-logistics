@@ -20,7 +20,6 @@ export function AddDriverDialog({ open, onOpenChange, onSuccess }: AddDriverDial
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    password: '',
     status: 'available' as const,
     role: 'driver' as const
   })
@@ -30,10 +29,13 @@ export function AddDriverDialog({ open, onOpenChange, onSuccess }: AddDriverDial
     setLoading(true)
 
     try {
+      // Generate a random password for auth
+      const randomPassword = Math.random().toString(36).slice(-8)
+      
       // Create auth user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
-        password: formData.password,
+        password: randomPassword,
         options: {
           data: {
             name: formData.name,
@@ -44,7 +46,7 @@ export function AddDriverDialog({ open, onOpenChange, onSuccess }: AddDriverDial
 
       if (authError) throw authError
 
-      // Create user profile with password
+      // Create user profile
       if (authData.user) {
         const { error: profileError } = await supabase
           .from('users')
@@ -53,8 +55,7 @@ export function AddDriverDialog({ open, onOpenChange, onSuccess }: AddDriverDial
             email: formData.email,
             name: formData.name,
             role: formData.role,
-            status: formData.status,
-            password: formData.password // Store password in plain text (for demo purposes)
+            status: formData.status
           }])
 
         if (profileError) throw profileError
@@ -65,7 +66,6 @@ export function AddDriverDialog({ open, onOpenChange, onSuccess }: AddDriverDial
       setFormData({
         name: '',
         email: '',
-        password: '',
         status: 'available',
         role: 'driver'
       })
@@ -83,7 +83,7 @@ export function AddDriverDialog({ open, onOpenChange, onSuccess }: AddDriverDial
         <DialogHeader>
           <DialogTitle>Add New Driver</DialogTitle>
           <DialogDescription>
-            Fill in the details to add a new driver.
+            Fill in the details to add a new driver. A random password will be generated for authentication.
           </DialogDescription>
         </DialogHeader>
 
@@ -106,18 +106,6 @@ export function AddDriverDialog({ open, onOpenChange, onSuccess }: AddDriverDial
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              required
-              minLength={6}
             />
           </div>
 

@@ -5,7 +5,7 @@ import { User } from '@/types'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Edit, Trash2, Eye, EyeOff } from 'lucide-react'
+import { Edit, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { EditDriverDialog } from './EditDriverDialog'
@@ -19,7 +19,6 @@ export function DriversTable({ drivers, onRefresh }: DriversTableProps) {
   const [loading, setLoading] = useState(false)
   const [editingDriver, setEditingDriver] = useState<User | null>(null)
   const [showEditDialog, setShowEditDialog] = useState(false)
-  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set())
 
   const refreshDrivers = async () => {
     setLoading(true)
@@ -47,16 +46,6 @@ export function DriversTable({ drivers, onRefresh }: DriversTableProps) {
     } catch (error: any) {
       toast.error(error.message || 'Error deleting driver')
     }
-  }
-
-  const togglePasswordVisibility = (driverId: string) => {
-    const newVisiblePasswords = new Set(visiblePasswords)
-    if (newVisiblePasswords.has(driverId)) {
-      newVisiblePasswords.delete(driverId)
-    } else {
-      newVisiblePasswords.add(driverId)
-    }
-    setVisiblePasswords(newVisiblePasswords)
   }
 
   const getStatusBadge = (status: string) => {
@@ -92,7 +81,6 @@ export function DriversTable({ drivers, onRefresh }: DriversTableProps) {
             <TableHead>Email</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Role</TableHead>
-            <TableHead>Password</TableHead>
             <TableHead>Joined</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
@@ -107,30 +95,6 @@ export function DriversTable({ drivers, onRefresh }: DriversTableProps) {
                 <Badge className="bg-blue-100 text-blue-800">
                   {driver.role}
                 </Badge>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center space-x-2">
-                  {visiblePasswords.has(driver.id) ? (
-                    <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
-                      {driver.password || '••••••••'}
-                    </span>
-                  ) : (
-                    <span className="font-mono">••••••••</span>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => togglePasswordVisibility(driver.id)}
-                    className="h-6 w-6 p-0"
-                    aria-label={visiblePasswords.has(driver.id) ? 'Hide password' : 'Show password'}
-                  >
-                    {visiblePasswords.has(driver.id) ? (
-                      <EyeOff className="h-3 w-3" />
-                    ) : (
-                      <Eye className="h-3 w-3" />
-                    )}
-                  </Button>
-                </div>
               </TableCell>
               <TableCell>
                 {new Date(driver.created_at).toLocaleDateString()}
