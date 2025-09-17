@@ -44,7 +44,7 @@ export function AddDriverDialog({ open, onOpenChange, onSuccess }: AddDriverDial
 
       if (authError) throw authError
 
-      // Create user profile
+      // Create user profile with password
       if (authData.user) {
         const { error: profileError } = await supabase
           .from('users')
