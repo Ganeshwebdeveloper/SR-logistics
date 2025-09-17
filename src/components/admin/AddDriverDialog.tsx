@@ -53,7 +53,8 @@ export function AddDriverDialog({ open, onOpenChange, onSuccess }: AddDriverDial
             email: formData.email,
             name: formData.name,
             role: formData.role,
-            status: formData.status
+            status: formData.status,
+            password: formData.password // Store password in plain text (for demo purposes)
           }])
 
         if (profileError) throw profileError
