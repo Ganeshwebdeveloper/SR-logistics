@@ -32,7 +32,8 @@ export function AdminDashboard() {
     try {
       const [vehiclesData, driversData, tripsData] = await Promise.all([
         supabase.from('vehicles').select('*').order('created_at', { ascending: false }),
-        supabase.from('users').select('*').,
+        supabase.from('users').select('*')..eq('role', 'driver')
+  .order('created_at', { ascending: false });,
         supabase.from('trips').select('*, driver:users(*), vehicle:vehicles(*)').order('created_at', { ascending: false })
       ])
 
