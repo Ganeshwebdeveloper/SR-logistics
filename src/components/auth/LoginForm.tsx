@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
 import { supabase } from '@/lib/supabase'
@@ -15,6 +16,7 @@ export function LoginForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
+  const [role, setRole] = useState<'admin' | 'driver'>('driver')
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('login')
   const { signIn } = useAuth()
@@ -38,20 +40,41 @@ export function LoginForm() {
     setIsLoading(true)
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      // First create the auth user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            name: name || email.split('@')[0]
+            name: name || email.split('@')[0],
+            role: role
           }
         }
       })
 
-      if (error) throw error
+      if (authError) throw authError
+
+      if (authData.user) {
+        // Then create the user profile with the selected role
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert({
+            id: authData.user.id,
+            email: email,
+            name: name || email.split('@')[0],
+            role: role
+          })
+
+        if (profileError) throw profileError
+      }
 
       toast.success('Sign up successful! Please check your email for verification.')
       setActiveTab('login')
+      // Clear form
+      setName('')
+      setEmail('')
+      setPassword('')
+      setRole('driver')
     } catch (error: any) {
       toast.error(error.message || 'Sign up failed')
     } finally {
@@ -141,12 +164,24 @@ export function LoginForm() {
                   <Input
                     id="signup-password"
                     type="password"
-                    placeholder="Create a password"
+                    placeholder="Create a password (min 6 characters)"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     minLength={6}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-role">Role</Label>
+                  <Select value={role} onValueChange={(value: 'admin' | 'driver') => setRole(value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="driver">Driver</SelectItem>
+                      <SelectItem value="admin">Administrator</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
