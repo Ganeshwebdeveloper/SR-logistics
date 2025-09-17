@@ -54,7 +54,7 @@ export function AdminDashboard() {
     }
   }
 
-  console.log(drivers)
+  console.log(drivers,supabase)
 
   const refreshDrivers = async () => {
     try {
