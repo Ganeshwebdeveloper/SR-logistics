@@ -57,7 +57,7 @@ export function AdminDashboard() {
   const refreshDrivers = async () => {
     try {
       const { data, error } = await supabase
-        .from('users')
+        .from('users.role = driver')
         .select('*')
         .order('created_at', { ascending: false })
       
