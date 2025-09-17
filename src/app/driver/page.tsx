@@ -1,26 +1,21 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { LoginForm } from '@/components/auth/LoginForm'
-import { Navbar } from '@/components/layout/Navbar'
-import { AdminDashboard } from '@/components/admin/AdminDashboard'
-import { DriverDashboard } from '@/components/driver/DriverDashboard'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
-import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
+import { DriverDashboard } from '@/components/driver/DriverDashboard'
+import { Navbar } from '@/components/layout/Navbar'
+import { LoadingSpinner } from '@/components/ui/loading-spinner'
 
-export default function Home() {
+export default function DriverPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading && user) {
-      // Redirect based on role
-      if (user.role === 'admin') {
-        router.push('/admin')
-      } else {
-        router.push('/driver')
-      }
+    if (!loading && !user) {
+      router.push('/')
+    } else if (user && user.role === 'admin') {
+      router.push('/admin')
     }
   }, [user, loading, router])
 
@@ -33,19 +28,14 @@ export default function Home() {
   }
 
   if (!user) {
-    return <LoginForm />
+    return null
   }
 
-  // This should not be reached due to redirect, but just in case
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {user.role === 'admin' ? (
-          <AdminDashboard />
-        ) : (
-          <DriverDashboard />
-        )}
+        <DriverDashboard />
       </main>
     </div>
   )

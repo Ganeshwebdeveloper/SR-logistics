@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { User } from '@/types'
+import { useRouter } from 'next/navigation'
 
 interface AuthContextType {
   user: User | null
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
   useEffect(() => {
     const getSession = async () => {
@@ -44,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
+      // Try to get user profile from public.users table
       const { data: userData, error } = await supabase
         .from('users')
         .select('*')
@@ -52,12 +55,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (error) {
         console.error('Error fetching user profile:', error)
+        // If user profile doesn't exist yet, create a minimal one
+        await createMinimalUserProfile(userId)
         return
       }
       
       setUser(userData)
+      // Redirect based on role
+      if (userData.role === 'admin') {
+        router.push('/admin')
+      } else {
+        router.push('/driver')
+      }
     } catch (error) {
       console.error('Error in fetchUserProfile:', error)
+    }
+  }
+
+  const createMinimalUserProfile = async (userId: string) => {
+    try {
+      // Get user data from auth
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+      
+      if (authError || !authUser) {
+        console.error('Error getting auth user:', authError)
+        return
+      }
+      
+      // Create minimal user profile
+      const { data: newUser, error: insertError } = await supabase
+        .from('users')
+        .insert([
+          {
+            id: userId,
+            email: authUser.email,
+            name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
+            role: authUser.user_metadata?.role || 'driver'
+          }
+        ])
+        .select()
+        .single()
+      
+      if (insertError) {
+        console.error('Error creating user profile:', insertError)
+        return
+      }
+      
+      setUser(newUser)
+      // Redirect based on role
+      if (newUser.role === 'admin') {
+        router.push('/admin')
+      } else {
+        router.push('/driver')
+      }
+    } catch (error) {
+      console.error('Error in createMinimalUserProfile:', error)
     }
   }
 
@@ -73,6 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { error } = await supabase.auth.signOut()
     if (error) throw error
     setUser(null)
+    router.push('/')
   }
 
   return (
