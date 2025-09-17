@@ -20,24 +20,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    const getSession = async () => {
+    // Get initial session
+    const initializeAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession()
+      
       if (session?.user) {
         await fetchUserProfile(session.user.id)
+      } else {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
-    getSession()
+    initializeAuth()
 
+    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session?.user) {
           await fetchUserProfile(session.user.id)
         } else {
           setUser(null)
+          setLoading(false)
         }
-        setLoading(false)
       }
     )
 
@@ -46,21 +50,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      // Try to get user profile from public.users table
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single()
+      // Try to get user profile with retry logic
+      let retries = 0
+      let userData: User | null = null
       
-      if (error) {
-        console.error('Error fetching user profile:', error)
-        // If user profile doesn't exist yet, create a minimal one
-        await createMinimalUserProfile(userId)
+      while (retries < 3 && !userData) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single()
+
+        if (error) {
+          console.log('Retry', retries + 1, 'failed:', error.message)
+          retries++
+          await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
+          continue
+        }
+
+        userData = data
+      }
+
+      if (!userData) {
+        // If user profile still doesn't exist, create it
+        await createUserProfile(userId)
         return
       }
-      
+
       setUser(userData)
+      setLoading(false)
+      
       // Redirect based on role
       if (userData.role === 'admin') {
         router.push('/admin')
@@ -68,40 +87,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.push('/driver')
       }
     } catch (error) {
-      console.error('Error in fetchUserProfile:', error)
+      console.error('Error fetching user profile:', error)
+      setLoading(false)
     }
   }
 
-  const createMinimalUserProfile = async (userId: string) => {
+  const createUserProfile = async (userId: string) => {
     try {
-      // Get user data from auth
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+      // Get auth user data
+      const { data: { user: authUser } } = await supabase.auth.getUser()
       
-      if (authError || !authUser) {
-        console.error('Error getting auth user:', authError)
-        return
+      if (!authUser) {
+        throw new Error('No auth user found')
       }
-      
-      // Create minimal user profile
-      const { data: newUser, error: insertError } = await supabase
+
+      // Create user profile with default role as driver
+      const { data: newUser, error } = await supabase
         .from('users')
         .insert([
           {
             id: userId,
-            email: authUser.email,
+            email: authUser.email!,
             name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
             role: authUser.user_metadata?.role || 'driver'
           }
         ])
         .select()
         .single()
-      
-      if (insertError) {
-        console.error('Error creating user profile:', insertError)
+
+      if (error) {
+        console.error('Error creating user profile:', error)
         return
       }
-      
+
       setUser(newUser)
+      setLoading(false)
+      
       // Redirect based on role
       if (newUser.role === 'admin') {
         router.push('/admin')
@@ -109,7 +130,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.push('/driver')
       }
     } catch (error) {
-      console.error('Error in createMinimalUserProfile:', error)
+      console.error('Error creating user profile:', error)
+      setLoading(false)
     }
   }
 

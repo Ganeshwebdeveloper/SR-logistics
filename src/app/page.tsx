@@ -2,32 +2,16 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { LoginForm } from '@/components/auth/LoginForm'
-import { Navbar } from '@/components/layout/Navbar'
-import { AdminDashboard } from '@/components/admin/AdminDashboard'
-import { DriverDashboard } from '@/components/driver/DriverDashboard'
 import { LoadingSpinner } from '@/components/ui/loading-spinner'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 
 export default function Home() {
   const { user, loading } = useAuth()
-  const router = useRouter()
-
-  useEffect(() => {
-    if (!loading && user) {
-      // Redirect based on role
-      if (user.role === 'admin') {
-        router.push('/admin')
-      } else {
-        router.push('/driver')
-      }
-    }
-  }, [user, loading, router])
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />
+        <p className="ml-4 text-gray-600">Loading...</p>
       </div>
     )
   }
@@ -36,17 +20,11 @@ export default function Home() {
     return <LoginForm />
   }
 
-  // This should not be reached due to redirect, but just in case
+  // This should not be reached due to redirect in AuthContext
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {user.role === 'admin' ? (
-          <AdminDashboard />
-        ) : (
-          <DriverDashboard />
-        )}
-      </main>
+    <div className="min-h-screen flex items-center justify-center">
+      <LoadingSpinner size="lg" />
+      <p className="ml-4 text-gray-600">Redirecting to dashboard...</p>
     </div>
   )
 }
