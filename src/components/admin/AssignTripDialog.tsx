@@ -25,8 +25,7 @@ export function AssignTripDialog({ open, onOpenChange, vehicles, drivers, onSucc
     vehicle_id: '',
     start_location: '',
     end_location: '',
-    distance: 0,
-    estimated_duration: 0
+    start_time: new Date().toISOString().slice(0, 16) // Current date/time for start
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,8 +38,9 @@ export function AssignTripDialog({ open, onOpenChange, vehicles, drivers, onSucc
         .insert([{
           ...formData,
           status: 'pending',
-          distance: Number(formData.distance),
-          estimated_duration: Number(formData.estimated_duration)
+          distance: 0, // Will be updated by GPS when trip starts
+          estimated_duration: 0, // Not required as per request
+          start_time: new Date(formData.start_time).toISOString()
         }])
 
       if (error) throw error
@@ -52,8 +52,7 @@ export function AssignTripDialog({ open, onOpenChange, vehicles, drivers, onSucc
         vehicle_id: '',
         start_location: '',
         end_location: '',
-        distance: 0,
-        estimated_duration: 0
+        start_time: new Date().toISOString().slice(0, 16)
       })
       onSuccess()
     } catch (error: any) {
@@ -64,7 +63,6 @@ export function AssignTripDialog({ open, onOpenChange, vehicles, drivers, onSucc
   }
 
   const availableVehicles = vehicles.filter(v => v.status === 'available')
-  const availableDrivers = drivers
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -88,7 +86,7 @@ export function AssignTripDialog({ open, onOpenChange, vehicles, drivers, onSucc
                 <SelectValue placeholder="Select driver" />
               </SelectTrigger>
               <SelectContent>
-                {availableDrivers.map(driver => (
+                {drivers.map(driver => (
                   <SelectItem key={driver.id} value={driver.id}>
                     {driver.name} ({driver.email})
                   </SelectItem>
@@ -138,29 +136,15 @@ export function AssignTripDialog({ open, onOpenChange, vehicles, drivers, onSucc
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="distance">Distance (km)</Label>
-              <Input
-                id="distance"
-                type="number"
-                min="0"
-                value={formData.distance}
-                onChange={(e) => setFormData({ ...formData, distance: Number(e.target.value) })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="duration">Est. Duration (min)</Label>
-              <Input
-                id="duration"
-                type="number"
-                min="0"
-                value={formData.estimated_duration}
-                onChange={(e) => setFormData({ ...formData, estimated_duration: Number(e.target.value) })}
-                required
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="start_time">Start Date & Time</Label>
+            <Input
+              id="start_time"
+              type="datetime-local"
+              value={formData.start_time}
+              onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+              required
+            />
           </div>
 
           <div className="flex justify-end space-x-2">

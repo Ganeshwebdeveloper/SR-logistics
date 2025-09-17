@@ -32,7 +32,7 @@ export function AdminDashboard() {
     try {
       const [vehiclesData, driversData, tripsData] = await Promise.all([
         supabase.from('vehicles').select('*').order('created_at', { ascending: false }),
-        supabase.from('users').select('*').eq('role', 'driver').order('created_at', { ascending: false }),
+        supabase.from('users').select('*').order('created_at', { ascending: false }),
         supabase.from('trips').select('*, driver:users(*), vehicle:vehicles(*)').order('created_at', { ascending: false })
       ])
 
@@ -46,6 +46,22 @@ export function AdminDashboard() {
     }
   }
 
+  const refreshDrivers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false })
+      
+      if (error) throw error
+      setDrivers(data || [])
+      return true
+    } catch (error) {
+      toast.error('Error refreshing drivers')
+      return false
+    }
+  }
+
   const stats = [
     {
       title: 'Total Vehicles',
@@ -54,7 +70,7 @@ export function AdminDashboard() {
       color: 'text-blue-600'
     },
     {
-      title: 'Active Drivers',
+      title: 'Total Drivers',
       value: drivers.length,
       icon: Users,
       color: 'text-green-600'
@@ -119,7 +135,7 @@ export function AdminDashboard() {
         </TabsContent>
 
         <TabsContent value="drivers">
-          <DriversTable drivers={drivers} />
+          <DriversTable drivers={drivers} onRefresh={refreshDrivers} />
         </TabsContent>
 
         <TabsContent value="map">
