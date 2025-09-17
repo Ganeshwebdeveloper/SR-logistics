@@ -36,7 +36,7 @@ export function AdminDashboard() {
        .order('created_at', { ascending: false }),
         supabase.from('trips').select('*, driver:users(*), vehicle:vehicles(*)').order('created_at', { ascending: false })
       ])
-
+       console.log(driversData)
       setVehicles(vehiclesData.data || [])
       setDrivers(driversData.data || [])
       setTrips(tripsData.data || [])
