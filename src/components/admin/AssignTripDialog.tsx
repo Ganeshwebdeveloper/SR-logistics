@@ -33,6 +33,26 @@ export function AssignTripDialog({ open, onOpenChange, vehicles, drivers, onSucc
     setLoading(true)
 
     try {
+      // Update driver status to 'assigned'
+      if (formData.driver_id) {
+        const { error: driverError } = await supabase
+          .from('users')
+          .update({ status: 'assigned' })
+          .eq('id', formData.driver_id)
+        
+        if (driverError) throw driverError
+      }
+
+      // Update vehicle status to 'in_use'
+      if (formData.vehicle_id) {
+        const { error: vehicleError } = await supabase
+          .from('vehicles')
+          .update({ status: 'in_use' })
+          .eq('id', formData.vehicle_id)
+        
+        if (vehicleError) throw vehicleError
+      }
+
       const { error } = await supabase
         .from('trips')
         .insert([{
@@ -63,6 +83,7 @@ export function AssignTripDialog({ open, onOpenChange, vehicles, drivers, onSucc
   }
 
   const availableVehicles = vehicles.filter(v => v.status === 'available')
+  const availableDrivers = drivers.filter(d => d.status === 'available')
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -86,7 +107,7 @@ export function AssignTripDialog({ open, onOpenChange, vehicles, drivers, onSucc
                 <SelectValue placeholder="Select driver" />
               </SelectTrigger>
               <SelectContent>
-                {drivers.map(driver => (
+                {availableDrivers.map(driver => (
                   <SelectItem key={driver.id} value={driver.id}>
                     {driver.name} ({driver.email})
                   </SelectItem>

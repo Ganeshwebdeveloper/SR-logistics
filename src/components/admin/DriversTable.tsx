@@ -1,11 +1,14 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import { User } from '@/types'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Edit, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { EditDriverDialog } from './EditDriverDialog'
 
 interface DriversTableProps {
   drivers: User[]
@@ -14,6 +17,8 @@ interface DriversTableProps {
 
 export function DriversTable({ drivers, onRefresh }: DriversTableProps) {
   const [loading, setLoading] = useState(false)
+  const [editingDriver, setEditingDriver] = useState<User | null>(null)
+  const [showEditDialog, setShowEditDialog] = useState(false)
 
   const refreshDrivers = async () => {
     setLoading(true)
@@ -25,6 +30,36 @@ export function DriversTable({ drivers, onRefresh }: DriversTableProps) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleDelete = async (driverId: string) => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', driverId)
+
+      if (error) throw error
+
+      toast.success('Driver deleted successfully')
+      onRefresh()
+    } catch (error: any) {
+      toast.error(error.message || 'Error deleting driver')
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    const statusColors = {
+      available: 'bg-green-100 text-green-800',
+      assigned: 'bg-yellow-100 text-yellow-800',
+      on_trip: 'bg-blue-100 text-blue-800'
+    }
+
+    return (
+      <Badge className={statusColors[status as keyof typeof statusColors]}>
+        {status}
+      </Badge>
+    )
   }
 
   return (
@@ -44,8 +79,11 @@ export function DriversTable({ drivers, onRefresh }: DriversTableProps) {
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
+            <TableHead>Status</TableHead>
             <TableHead>Role</TableHead>
+            <TableHead>Password</TableHead>
             <TableHead>Joined</TableHead>
+            <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -53,18 +91,52 @@ export function DriversTable({ drivers, onRefresh }: DriversTableProps) {
             <TableRow key={driver.id}>
               <TableCell className="font-medium">{driver.name}</TableCell>
               <TableCell>{driver.email}</TableCell>
+              <TableCell>{getStatusBadge(driver.status || 'available')}</TableCell>
               <TableCell>
                 <Badge className="bg-blue-100 text-blue-800">
                   {driver.role}
                 </Badge>
               </TableCell>
+              <TableCell>••••••••</TableCell>
               <TableCell>
                 {new Date(driver.created_at).toLocaleDateString()}
+              </TableCell>
+              <TableCell>
+                <div className="flex space-x-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => {
+                      setEditingDriver(driver)
+                      setShowEditDialog(true)
+                    }}
+                    aria-label={`Edit ${driver.name}`}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(driver.id)}
+                    aria-label={`Delete ${driver.name}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+
+      {editingDriver && (
+        <EditDriverDialog
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          driver={editingDriver}
+          onSuccess={onRefresh}
+        />
+      )}
     </div>
   )
 }

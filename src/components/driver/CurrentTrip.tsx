@@ -21,6 +21,7 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
   useEffect(() => {
     if (trip.status === 'in_progress') {
       startGPSMonitoring()
+      updateDriverStatus('on_trip')
     }
   }, [trip.status])
 
@@ -40,6 +41,19 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
       )
 
       return () => navigator.geolocation.clearWatch(watchId)
+    }
+  }
+
+  const updateDriverStatus = async (status: 'available' | 'assigned' | 'on_trip') => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ status })
+        .eq('id', trip.driver_id)
+
+      if (error) throw error
+    } catch (error) {
+      console.error('Error updating driver status:', error)
     }
   }
 
@@ -83,6 +97,18 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
     } finally {
       setUpdating(false)
     }
+  }
+
+  const handleCompleteTrip = async () => {
+    // Update driver status to available
+    await updateDriverStatus('available')
+    // Update vehicle status to available
+    await supabase
+      .from('vehicles')
+      .update({ status: 'available' })
+      .eq('id', trip.vehicle_id)
+    
+    onComplete()
   }
 
   const calculateProgress = () => {
@@ -173,7 +199,7 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
             <RefreshCw className={`h-4 w-4 mr-2 ${updating ? 'animate-spin' : ''}`} />
             {updating ? 'Updating...' : 'Update Distance'}
           </Button>
-          <Button onClick={onComplete} className="flex-1 bg-green-600 hover:bg-green-700">
+          <Button onClick={handleCompleteTrip} className="flex-1 bg-green-600 hover:bg-green-700">
             Complete Trip
           </Button>
         </div>

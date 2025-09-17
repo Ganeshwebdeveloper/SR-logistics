@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Plus, Users, Car, MapPin, BarChart3 } from 'lucide-react'
 import { toast } from 'sonner'
 import { AddVehicleDialog } from './AddVehicleDialog'
+import { AddDriverDialog } from './AddDriverDialog'
 import { AssignTripDialog } from './AssignTripDialog'
 import { VehiclesTable } from './VehiclesTable'
 import { DriversTable } from './DriversTable'
@@ -21,6 +22,7 @@ export function AdminDashboard() {
   const [drivers, setDrivers] = useState<User[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
   const [showAddVehicle, setShowAddVehicle] = useState(false)
+  const [showAddDriver, setShowAddDriver] = useState(false)
   const [showAssignTrip, setShowAssignTrip] = useState(false)
   const [loading, setLoading] = useState(true)
 
@@ -36,7 +38,7 @@ export function AdminDashboard() {
         { data: tripsData, error: tripsError }
       ] = await Promise.all([
         supabase.from('vehicles').select('*').order('created_at', { ascending: false }),
-        supabase.from('users').select('*').eq('role', 'driver').order('created_at', { ascending: false }),
+        supabase.from('users').select('*').order('created_at', { ascending: false }),
         supabase.from('trips').select('*, driver:users(*), vehicle:vehicles(*)').order('created_at', { ascending: false })
       ])
 
@@ -53,8 +55,6 @@ export function AdminDashboard() {
       setLoading(false)
     }
   }
-
-  console.log(drivers)
 
   const refreshDrivers = async () => {
     try {
@@ -122,6 +122,10 @@ export function AdminDashboard() {
           <Plus className="h-4 w-4 mr-2" />
           Add Vehicle
         </Button>
+        <Button onClick={() => setShowAddDriver(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Driver
+        </Button>
         <Button variant="outline" onClick={() => setShowAssignTrip(true)}>
           <MapPin className="h-4 w-4 mr-2" />
           Assign Trip
@@ -156,6 +160,12 @@ export function AdminDashboard() {
       <AddVehicleDialog
         open={showAddVehicle}
         onOpenChange={setShowAddVehicle}
+        onSuccess={fetchData}
+      />
+
+      <AddDriverDialog
+        open={showAddDriver}
+        onOpenChange={setShowAddDriver}
         onSuccess={fetchData}
       />
 
