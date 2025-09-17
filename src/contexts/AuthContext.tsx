@@ -26,21 +26,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     const initializeAuth = async () => {
       debug.log('Initializing auth...')
-      const { data: { session }, error } = await supabase.auth.getSession()
-      
-      if (error) {
-        debug.error('Error getting session:', error)
-        setLoading(false)
-        return
-      }
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          debug.error('Error getting session:', error)
+          setLoading(false)
+          return
+        }
 
-      debug.log('Session data:', session)
-      
-      if (session?.user) {
-        debug.log('User found in session:', session.user.id)
-        await handleUserSession(session.user.id)
-      } else {
-        debug.log('No user session found')
+        debug.log('Session data:', session)
+        
+        if (session?.user) {
+          debug.log('User found in session:', session.user.id)
+          await handleUserSession(session.user.id)
+        } else {
+          debug.log('No user session found')
+          setLoading(false)
+        }
+      } catch (error) {
+        debug.error('Error in initializeAuth:', error)
         setLoading(false)
       }
     }
@@ -51,11 +56,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       async (event, session) => {
         debug.log('Auth state changed:', event, session?.user?.id)
         
-        if (session?.user) {
-          await handleUserSession(session.user.id)
-        } else {
-          debug.log('User signed out')
-          setUser(null)
+        try {
+          if (session?.user) {
+            await handleUserSession(session.user.id)
+          } else {
+            debug.log('User signed out')
+            setUser(null)
+            setLoading(false)
+          }
+        } catch (error) {
+          debug.error('Error in auth state change:', error)
           setLoading(false)
         }
       }
@@ -68,9 +78,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       debug.log('Handling user session for:', userId)
       
-      // Ensure user profile exists
-      const userProfile = await ensureUserProfileExists(userId)
+      // Ensure user profile exists with retry logic
+      let retries = 0
+      let userProfile: User | null = null
       
+      while (retries < 3 && !userProfile) {
+        try {
+          userProfile = await ensureUserProfileExists(userId)
+          if (!userProfile) {
+            debug.log(`Retry ${retries + 1}: User profile not found`)
+            retries++
+            await new Promise(resolve => setTimeout(resolve, 1000))
+          }
+        } catch (error) {
+          debug.log(`Retry ${retries + 1} failed:`, error)
+          retries++
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+      }
+
+      if (!userProfile) {
+        debug.error('Failed to get or create user profile after retries')
+        setLoading(false)
+        return
+      }
+
       debug.log('User profile:', userProfile)
       setUser(userProfile)
       setLoading(false)
@@ -91,26 +123,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     debug.log('Signing in with email:', email)
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    if (error) {
-      debug.error('Sign in error:', error)
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+      if (error) {
+        debug.error('Sign in error:', error)
+        throw error
+      }
+      debug.log('Sign in successful')
+    } catch (error) {
+      debug.error('Sign in failed:', error)
       throw error
     }
-    debug.log('Sign in successful')
   }
 
   const signOut = async () => {
     debug.log('Signing out')
-    const { error } = await supabase.auth.signOut()
-    if (error) {
-      debug.error('Sign out error:', error)
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) {
+        debug.error('Sign out error:', error)
+        throw error
+      }
+      setUser(null)
+      router.push('/')
+    } catch (error) {
+      debug.error('Sign out failed:', error)
       throw error
     }
-    setUser(null)
-    router.push('/')
   }
 
   return (
