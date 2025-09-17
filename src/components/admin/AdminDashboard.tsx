@@ -36,7 +36,7 @@ export function AdminDashboard() {
         { data: tripsData, error: tripsError }
       ] = await Promise.all([
         supabase.from('vehicles').select('*').order('created_at', { ascending: false }),
-        supabase.from('users').select('*').order('created_at', { ascending: false }),
+        supabase.from('driver:users').select('*').order('created_at', { ascending: false }),
         supabase.from('trips').select('*, driver:users(*), vehicle:vehicles(*)').order('created_at', { ascending: false })
       ])
 
