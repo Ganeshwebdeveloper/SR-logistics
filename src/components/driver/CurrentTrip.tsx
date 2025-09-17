@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { Trip } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { MapPin, Clock, Car, Navigation, RefreshCw } from 'lucide-react'
+import { MapPin, Clock, Car, Navigation, RefreshCw, AlertCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 
@@ -17,31 +17,83 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [distanceTraveled, setDistanceTraveled] = useState(0)
   const [updating, setUpdating] = useState(false)
+  const [gpsPermission, setGpsPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt')
+  const [gpsError, setGpsError] = useState<string>('')
 
   useEffect(() => {
     if (trip.status === 'in_progress') {
-      startGPSMonitoring()
+      checkGPSPermission()
       updateDriverStatus('on_trip')
     }
   }, [trip.status])
 
-  const startGPSMonitoring = () => {
-    if (navigator.geolocation) {
-      const watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords
-          setCurrentLocation({ lat: latitude, lng: longitude })
-          updateTripLocation(latitude, longitude)
-        },
-        (error) => {
-          console.error('GPS error:', error)
-          toast.error('Unable to access GPS location')
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      )
-
-      return () => navigator.geolocation.clearWatch(watchId)
+  const checkGPSPermission = async () => {
+    try {
+      const permissionStatus = await navigator.permissions.query({ name: 'geolocation' })
+      setGpsPermission(permissionStatus.state)
+      
+      permissionStatus.onchange = () => {
+        setGpsPermission(permissionStatus.state)
+      }
+    } catch (error) {
+      console.log('Permission API not supported')
+      setGpsPermission('prompt')
     }
+  }
+
+  const requestGPSPermission = async () => {
+    if (!navigator.geolocation) {
+      setGpsError('Geolocation is not supported by your browser')
+      return false
+    }
+
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        })
+      })
+
+      setGpsPermission('granted')
+      setGpsError('')
+      startGPSMonitoring()
+      return true
+    } catch (error: any) {
+      setGpsPermission('denied')
+      setGpsError(error.message || 'Failed to access GPS location')
+      toast.error('GPS access denied. Please enable location services.')
+      return false
+    }
+  }
+
+  const startGPSMonitoring = () => {
+    if (!navigator.geolocation) {
+      setGpsError('Geolocation is not supported by your browser')
+      return
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords
+        setCurrentLocation({ lat: latitude, lng: longitude })
+        updateTripLocation(latitude, longitude)
+        setGpsError('')
+      },
+      (error) => {
+        console.error('GPS error:', error)
+        setGpsError(error.message)
+        toast.error('GPS error: ' + error.message)
+      },
+      { 
+        enableHighAccuracy: true, 
+        timeout: 30000, 
+        maximumAge: 60000 
+      }
+    )
+
+    return () => navigator.geolocation.clearWatch(watchId)
   }
 
   const updateDriverStatus = async (status: 'available' | 'assigned' | 'on_trip') => {
@@ -181,10 +233,57 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
             </div>
           </div>
           
-          {currentLocation && (
-            <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-              <p className="font-medium">Current Location:</p>
-              <p>Lat: {currentLocation.lat.toFixed(6)}, Lng: {currentLocation.lng.toFixed(6)}</p>
+          {/* GPS Permission Section */}
+          {gpsPermission === 'denied' && (
+            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+              <div className="flex items-center space-x-2 text-red-800">
+                <AlertCircle className="h-4 w-4" />
+                <p className="text-sm font-medium">GPS Access Denied</p>
+              </div>
+              <p className="text-sm text-red-600 mt-1">
+                Please enable location services in your browser settings to track your location.
+              </p>
+            </div>
+          )}
+
+          {gpsPermission === 'prompt' && (
+            <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+              <div className="flex items-center space-x-2 text-yellow-800">
+                <AlertCircle className="h-4 w-4" />
+                <p className="text-sm font-medium">GPS Permission Required</p>
+              </div>
+              <p className="text-sm text-yellow-600 mt-1 mb-2">
+                Enable GPS tracking to monitor your location during the trip.
+              </p>
+              <Button 
+                onClick={requestGPSPermission} 
+                size="sm" 
+                className="bg-yellow-600 hover:bg-yellow-700"
+              >
+                Enable GPS Tracking
+              </Button>
+            </div>
+          )}
+
+          {gpsPermission === 'granted' && currentLocation && (
+            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+              <div className="flex items-center space-x-2 text-green-800">
+                <MapPin className="h-4 w-4" />
+                <p className="text-sm font-medium">Current Location:</p>
+              </div>
+              <p className="text-sm mt-1">
+                Latitude: {currentLocation.lat.toFixed(6)}, Longitude: {currentLocation.lng.toFixed(6)}
+              </p>
+            </div>
+          )}
+
+          {gpsError && (
+            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+              <div className="flex items-center space-x-2 text-red-800">
+                <AlertCircle className="h-4 w-4" />
+                <p className="text-sm font-medium">GPS Error</p>
+              </div>
+              <p className="text-sm text-red-600 mt-1">{gpsError}</p>
             </div>
           )}
         </div>
