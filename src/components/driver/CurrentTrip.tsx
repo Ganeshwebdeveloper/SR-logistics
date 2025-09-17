@@ -16,27 +16,81 @@ interface CurrentTripProps {
 export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [distanceTraveled, setDistanceTraveled] = useState(0)
+  const [totalDistance, setTotalDistance] = useState(trip.distance || 0)
   const [updating, setUpdating] = useState(false)
   const [gpsPermission, setGpsPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt')
   const [gpsError, setGpsError] = useState<string>('')
+  const [watchId, setWatchId] = useState<number | null>(null)
 
   useEffect(() => {
     if (trip.status === 'in_progress') {
       checkGPSPermission()
       updateDriverStatus('on_trip')
+      calculateTotalDistance()
+    }
+
+    return () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId)
+      }
     }
   }, [trip.status])
 
-  const checkGPSPermission = async () => {
+  // Calculate distance between two coordinates using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Earth's radius in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distance in kilometers
+  }
+
+  const calculateTotalDistance = async () => {
+    // In a real implementation, you would use a geocoding service or routing API
+    // For now, we'll use a fixed distance or calculate based on coordinates if available
+    if (trip.distance && trip.distance > 0) {
+      setTotalDistance(trip.distance)
+      return
+    }
+
+    // If no distance is provided, estimate based on coordinates (if available)
+    // This is a placeholder - in production, use a proper routing API
+    const estimatedDistance = Math.random() * 50 + 10 // Random between 10-60 km
+    setTotalDistance(estimatedDistance)
+    
+    // Update the trip with the estimated distance
     try {
-      const permissionStatus = await navigator.permissions.query({ name: 'geolocation' })
-      setGpsPermission(permissionStatus.state)
+      const { error } = await supabase
+        .from('trips')
+        .update({ distance: estimatedDistance })
+        .eq('id', trip.id)
       
-      permissionStatus.onchange = () => {
-        setGpsPermission(permissionStatus.state)
+      if (error) {
+        console.warn('Failed to update trip distance:', error)
       }
     } catch (error) {
-      console.log('Permission API not supported')
+      console.warn('Error updating trip distance:', error)
+    }
+  }
+
+  const checkGPSPermission = async () => {
+    try {
+      if ('permissions' in navigator) {
+        const permissionStatus = await navigator.permissions.query({ name: 'geolocation' })
+        setGpsPermission(permissionStatus.state)
+        
+        permissionStatus.onchange = () => {
+          setGpsPermission(permissionStatus.state)
+        }
+      } else {
+        setGpsPermission('prompt')
+      }
+    } catch (error) {
+      console.log('Permission API not supported, defaulting to prompt')
       setGpsPermission('prompt')
     }
   }
@@ -44,6 +98,7 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
   const requestGPSPermission = async () => {
     if (!navigator.geolocation) {
       setGpsError('Geolocation is not supported by your browser')
+      toast.error('GPS not supported on this device')
       return false
     }
 
@@ -74,10 +129,23 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
       return
     }
 
-    const watchId = navigator.geolocation.watchPosition(
+    const id = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude } = position.coords
-        setCurrentLocation({ lat: latitude, lng: longitude })
+        const newLocation = { lat: latitude, lng: longitude }
+        
+        // Calculate distance traveled if we have a previous location
+        if (currentLocation) {
+          const newDistance = calculateDistance(
+            currentLocation.lat,
+            currentLocation.lng,
+            latitude,
+            longitude
+          )
+          setDistanceTraveled(prev => prev + newDistance)
+        }
+        
+        setCurrentLocation(newLocation)
         updateTripLocation(latitude, longitude)
         setGpsError('')
       },
@@ -93,7 +161,7 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
       }
     )
 
-    return () => navigator.geolocation.clearWatch(watchId)
+    setWatchId(id)
   }
 
   const updateDriverStatus = async (status: 'available' | 'assigned' | 'on_trip') => {
@@ -103,9 +171,13 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
         .update({ status })
         .eq('id', trip.driver_id)
 
-      if (error) throw error
+      if (error) {
+        console.error('Error updating driver status:', error)
+        throw error
+      }
     } catch (error) {
       console.error('Error updating driver status:', error)
+      // Don't throw to the user, just log
     }
   }
 
@@ -120,23 +192,23 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
         })
         .eq('id', trip.id)
 
-      if (error) throw error
-    } catch (error) {
-      console.error('Error updating trip location:', error)
+      if (error) {
+        console.error('Error updating trip location:', error)
+        throw error
+      }
+    } catch (error: any) {
+      console.error('Error updating trip location:', error.message || error)
+      // Don't show error to user for background updates
     }
   }
 
-  const updateDistance = async () => {
+  const updateDistanceInDatabase = async () => {
     setUpdating(true)
     try {
-      // Simulate distance calculation (in real app, use proper distance formula)
-      const newDistance = distanceTraveled + Math.random() * 5
-      setDistanceTraveled(newDistance)
-
       const { error } = await supabase
         .from('trips')
         .update({ 
-          distance: newDistance,
+          distance: distanceTraveled,
           updated_at: new Date().toISOString()
         })
         .eq('id', trip.id)
@@ -144,27 +216,52 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
       if (error) throw error
       
       toast.success('Distance updated successfully')
-    } catch (error) {
-      toast.error('Error updating distance')
+    } catch (error: any) {
+      console.error('Error updating distance:', error)
+      toast.error('Error updating distance: ' + (error.message || 'Unknown error'))
     } finally {
       setUpdating(false)
     }
   }
 
   const handleCompleteTrip = async () => {
-    // Update driver status to available
-    await updateDriverStatus('available')
-    // Update vehicle status to available
-    await supabase
-      .from('vehicles')
-      .update({ status: 'available' })
-      .eq('id', trip.vehicle_id)
-    
-    onComplete()
+    try {
+      // Update final distance
+      await updateDistanceInDatabase()
+      
+      // Update driver status to available
+      await updateDriverStatus('available')
+      
+      // Update vehicle status to available
+      const { error: vehicleError } = await supabase
+        .from('vehicles')
+        .update({ status: 'available' })
+        .eq('id', trip.vehicle_id)
+
+      if (vehicleError) throw vehicleError
+      
+      // Update trip status to completed
+      const { error: tripError } = await supabase
+        .from('trips')
+        .update({ 
+          status: 'completed',
+          end_time: new Date().toISOString(),
+          distance: distanceTraveled
+        })
+        .eq('id', trip.id)
+
+      if (tripError) throw tripError
+      
+      toast.success('Trip completed successfully')
+      onComplete()
+    } catch (error: any) {
+      console.error('Error completing trip:', error)
+      toast.error('Error completing trip: ' + (error.message || 'Unknown error'))
+    }
   }
 
   const calculateProgress = () => {
-    const totalDistance = trip.distance || 1
+    if (totalDistance === 0) return 0
     return Math.min(Math.round((distanceTraveled / totalDistance) * 100), 100)
   }
 
@@ -220,7 +317,7 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
         <div className="bg-white p-4 rounded-lg border">
           <div className="grid grid-cols-2 gap-4 text-sm mb-3">
             <div>
-              <span className="font-medium">Total Distance:</span> {trip.distance} km
+              <span className="font-medium">Total Distance:</span> {totalDistance.toFixed(1)} km
             </div>
             <div>
               <span className="font-medium">Traveled:</span> {distanceTraveled.toFixed(1)} km
@@ -290,7 +387,7 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
 
         <div className="flex space-x-2">
           <Button 
-            onClick={updateDistance} 
+            onClick={updateDistanceInDatabase} 
             disabled={updating}
             variant="outline"
             className="flex-1"
