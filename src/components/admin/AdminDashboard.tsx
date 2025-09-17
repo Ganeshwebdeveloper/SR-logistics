@@ -29,40 +29,24 @@ export function AdminDashboard() {
   }, [])
 
   const fetchData = async () => {
-  try {
-    const [
-      { data: vehiclesData, error: vehiclesError },
-      { data: driversData, error: driversError },
-      { data: tripsData, error: tripsError },
-    ] = await Promise.all([
-      supabase.from('vehicles')
-        .select('*')
-        .order('created_at', { ascending: false }),
+    try {
+      const [
+        { data: vehiclesData, error: vehiclesError },
+        { data: driversData, error: driversError },
+        { data: tripsData, error: tripsError }
+      ] = await Promise.all([
+        supabase.from('vehicles').select('*').order('created_at', { ascending: false }),
+        supabase.from('users').select('*').order('created_at', { ascending: false }),
+        supabase.from('trips').select('*, driver:users(*), vehicle:vehicles(*)').order('created_at', { ascending: false })
+      ])
 
-      supabase.from('users')
-        .select('*')
-        .eq('role', 'driver')
-        .order('created_at', { ascending: false }),
+      if (vehiclesError) throw vehiclesError
+      if (driversError) throw driversError
+      if (tripsError) throw tripsError
 
-      supabase.from('trips')
-        .select('*, driver:users(*), vehicle:vehicles(*)')
-        .order('created_at', { ascending: false }),
-    ]);
-
-    if (vehiclesError) throw vehiclesError;
-    if (driversError) throw driversError;
-    if (tripsError) throw tripsError;
-
-    return { vehiclesData, driversData, tripsData };
-  } catch (error) {
-    console.error('Fetch error:', error);
-    return { vehiclesData: [], driversData: [], tripsData: [] };
-  }
-};
-   
-      setVehicles(vehiclesData.data || [])
-      setDrivers(driversData.data || [])
-      setTrips(tripsData.data || [])
+      setVehicles(vehiclesData || [])
+      setDrivers(driversData || [])
+      setTrips(tripsData || [])
     } catch (error) {
       toast.error('Error fetching data')
     } finally {
