@@ -4,6 +4,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { User } from '@/types'
 import { useRouter } from 'next/navigation'
+import { debug } from '@/lib/debug'
+import { ensureUserProfileExists } from '@/lib/user-utils'
 
 interface AuthContextType {
   user: User | null
@@ -20,25 +22,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   useEffect(() => {
-    // Get initial session
+    debug.log('AuthProvider mounted')
+    
     const initializeAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
+      debug.log('Initializing auth...')
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      if (error) {
+        debug.error('Error getting session:', error)
+        setLoading(false)
+        return
+      }
+
+      debug.log('Session data:', session)
       
       if (session?.user) {
-        await fetchUserProfile(session.user.id)
+        debug.log('User found in session:', session.user.id)
+        await handleUserSession(session.user.id)
       } else {
+        debug.log('No user session found')
         setLoading(false)
       }
     }
 
     initializeAuth()
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        debug.log('Auth state changed:', event, session?.user?.id)
+        
         if (session?.user) {
-          await fetchUserProfile(session.user.id)
+          await handleUserSession(session.user.id)
         } else {
+          debug.log('User signed out')
           setUser(null)
           setLoading(false)
         }
@@ -48,104 +64,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  const fetchUserProfile = async (userId: string) => {
+  const handleUserSession = async (userId: string) => {
     try {
-      // Try to get user profile with retry logic
-      let retries = 0
-      let userData: User | null = null
+      debug.log('Handling user session for:', userId)
       
-      while (retries < 3 && !userData) {
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', userId)
-          .single()
-
-        if (error) {
-          console.log('Retry', retries + 1, 'failed:', error.message)
-          retries++
-          await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
-          continue
-        }
-
-        userData = data
-      }
-
-      if (!userData) {
-        // If user profile still doesn't exist, create it
-        await createUserProfile(userId)
-        return
-      }
-
-      setUser(userData)
+      // Ensure user profile exists
+      const userProfile = await ensureUserProfileExists(userId)
+      
+      debug.log('User profile:', userProfile)
+      setUser(userProfile)
       setLoading(false)
       
       // Redirect based on role
-      if (userData.role === 'admin') {
+      if (userProfile.role === 'admin') {
+        debug.log('Redirecting to admin dashboard')
         router.push('/admin')
       } else {
+        debug.log('Redirecting to driver dashboard')
         router.push('/driver')
       }
     } catch (error) {
-      console.error('Error fetching user profile:', error)
-      setLoading(false)
-    }
-  }
-
-  const createUserProfile = async (userId: string) => {
-    try {
-      // Get auth user data
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      
-      if (!authUser) {
-        throw new Error('No auth user found')
-      }
-
-      // Create user profile with default role as driver
-      const { data: newUser, error } = await supabase
-        .from('users')
-        .insert([
-          {
-            id: userId,
-            email: authUser.email!,
-            name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'User',
-            role: authUser.user_metadata?.role || 'driver'
-          }
-        ])
-        .select()
-        .single()
-
-      if (error) {
-        console.error('Error creating user profile:', error)
-        return
-      }
-
-      setUser(newUser)
-      setLoading(false)
-      
-      // Redirect based on role
-      if (newUser.role === 'admin') {
-        router.push('/admin')
-      } else {
-        router.push('/driver')
-      }
-    } catch (error) {
-      console.error('Error creating user profile:', error)
+      debug.error('Error handling user session:', error)
       setLoading(false)
     }
   }
 
   const signIn = async (email: string, password: string) => {
+    debug.log('Signing in with email:', email)
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
-    if (error) throw error
+    if (error) {
+      debug.error('Sign in error:', error)
+      throw error
+    }
+    debug.log('Sign in successful')
   }
 
   const signOut = async () => {
+    debug.log('Signing out')
     const { error } = await supabase.auth.signOut()
-    if (error) throw error
+    if (error) {
+      debug.error('Sign out error:', error)
+      throw error
+    }
     setUser(null)
     router.push('/')
   }
