@@ -40,7 +40,7 @@ export function LoginForm() {
     setIsLoading(true)
 
     try {
-      // First create the auth user
+      // Create auth user with role in metadata
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -53,20 +53,6 @@ export function LoginForm() {
       })
 
       if (authError) throw authError
-
-      if (authData.user) {
-        // Then create the user profile with the selected role
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert({
-            id: authData.user.id,
-            email: email,
-            name: name || email.split('@')[0],
-            role: role
-          })
-
-        if (profileError) throw profileError
-      }
 
       toast.success('Sign up successful! Please check your email for verification.')
       setActiveTab('login')
