@@ -14,6 +14,7 @@ import { VehiclesTable } from './VehiclesTable'
 import { DriversTable } from './DriversTable'
 import { TripsTable } from './TripsTable'
 import { LiveMap } from './LiveMap'
+import { WelcomeBanner } from '../dashboard/WelcomeBanner'
 
 export function AdminDashboard() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
@@ -74,6 +75,8 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-6">
+      <WelcomeBanner />
+      
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, index) => (
           <Card key={index}>

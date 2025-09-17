@@ -11,6 +11,7 @@ import { Play, MapPin, History, Car } from 'lucide-react'
 import { toast } from 'sonner'
 import { CurrentTrip } from './CurrentTrip'
 import { TripHistory } from './TripHistory'
+import { WelcomeBanner } from '../dashboard/WelcomeBanner'
 
 export function DriverDashboard() {
   const { user } = useAuth()
@@ -82,6 +83,8 @@ export function DriverDashboard() {
 
   return (
     <div className="space-y-6">
+      <WelcomeBanner />
+      
       {currentTrip ? (
         <CurrentTrip 
           trip={currentTrip} 
