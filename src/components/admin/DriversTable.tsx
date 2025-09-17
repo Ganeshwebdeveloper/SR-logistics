@@ -5,10 +5,11 @@ import { User } from '@/types'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Edit, Trash2 } from 'lucide-react'
+import { Edit, Trash2, Eye } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { EditDriverDialog } from './EditDriverDialog'
+import Link from 'next/link'
 
 interface DriversTableProps {
   drivers: User[]
@@ -88,7 +89,11 @@ export function DriversTable({ drivers, onRefresh }: DriversTableProps) {
         <TableBody>
           {drivers.map((driver) => (
             <TableRow key={driver.id}>
-              <TableCell className="font-medium">{driver.name}</TableCell>
+              <TableCell className="font-medium">
+                <Link href={`/driver/${driver.id}`} className="text-blue-600 hover:text-blue-800">
+                  {driver.name}
+                </Link>
+              </TableCell>
               <TableCell>{driver.email}</TableCell>
               <TableCell>{getStatusBadge(driver.status || 'available')}</TableCell>
               <TableCell>
@@ -112,6 +117,11 @@ export function DriversTable({ drivers, onRefresh }: DriversTableProps) {
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
+                  <Link href={`/driver/${driver.id}`}>
+                    <Button variant="ghost" size="sm" aria-label={`View ${driver.name} details`}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </Link>
                   <Button
                     variant="ghost"
                     size="sm"

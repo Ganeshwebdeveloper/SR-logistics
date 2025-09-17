@@ -1,5 +1,5 @@
 import React from 'react'
-import { Edit, Trash2 } from 'lucide-react'
+import { Edit, Trash2, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -10,6 +10,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Vehicle } from '@/types'
+import Link from 'next/link'
 
 interface VehiclesTableProps {
   vehicles: Vehicle[]
@@ -33,7 +34,11 @@ export function VehiclesTable({ vehicles, onEdit, onDelete }: VehiclesTableProps
       <TableBody>
         {vehicles.map((vehicle) => (
           <TableRow key={vehicle.id}>
-            <TableCell>{vehicle.make}</TableCell>
+            <TableCell>
+              <Link href={`/vehicle/${vehicle.id}`} className="text-blue-600 hover:text-blue-800">
+                {vehicle.make}
+              </Link>
+            </TableCell>
             <TableCell>{vehicle.model}</TableCell>
             <TableCell>{vehicle.year}</TableCell>
             <TableCell>{vehicle.license_plate}</TableCell>
@@ -58,6 +63,11 @@ export function VehiclesTable({ vehicles, onEdit, onDelete }: VehiclesTableProps
                 >
                   <Edit className="h-4 w-4" />
                 </Button>
+                <Link href={`/vehicle/${vehicle.id}`}>
+                  <Button variant="ghost" size="sm" aria-label={`View ${vehicle.make} ${vehicle.model} details`}>
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </Link>
                 <Button
                   variant="ghost"
                   size="sm"
