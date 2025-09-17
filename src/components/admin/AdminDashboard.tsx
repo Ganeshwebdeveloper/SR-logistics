@@ -62,6 +62,9 @@ export function AdminDashboard() {
     }
   }
 
+  // Filter to get only driver users for trip assignment
+  const driverUsers = drivers.filter(user => user.role === 'driver')
+
   const stats = [
     {
       title: 'Total Vehicles',
@@ -71,7 +74,7 @@ export function AdminDashboard() {
     },
     {
       title: 'Total Drivers',
-      value: drivers.length,
+      value: driverUsers.length,
       icon: Users,
       color: 'text-green-600'
     },
@@ -112,7 +115,11 @@ export function AdminDashboard() {
           <Plus className="h-4 w-4 mr-2" />
           Add Vehicle
         </Button>
-        <Button variant="outline" onClick={() => setShowAssignTrip(true)}>
+        <Button 
+          variant="outline" 
+          onClick={() => setShowAssignTrip(true)}
+          disabled={driverUsers.length === 0}
+        >
           <MapPin className="h-4 w-4 mr-2" />
           Assign Trip
         </Button>
@@ -153,7 +160,7 @@ export function AdminDashboard() {
         open={showAssignTrip}
         onOpenChange={setShowAssignTrip}
         vehicles={vehicles}
-        drivers={drivers}
+        drivers={driverUsers} // Pass only drivers, not admins
         onSuccess={fetchData}
       />
     </div>
