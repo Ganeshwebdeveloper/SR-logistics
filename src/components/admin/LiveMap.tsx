@@ -28,6 +28,10 @@ const Popup = dynamic(() => import('react-leaflet').then((mod) => mod.Popup), {
   ssr: false
 })
 
+const Icon = dynamic(() => import('react-leaflet').then((mod) => mod.Icon), {
+  ssr: false
+})
+
 interface LiveMapProps {
   trips: Trip[]
 }
@@ -39,19 +43,20 @@ export function LiveMap({ trips }: LiveMapProps) {
     setIsClient(true)
   }, [])
 
-  const getMarkerColor = (status: string) => {
-    switch (status) {
-      case 'in_progress':
-        return 'text-blue-600'
-      case 'completed':
-        return 'text-green-600'
-      case 'pending':
-        return 'text-yellow-600'
-      case 'cancelled':
-        return 'text-red-600'
-      default:
-        return 'text-gray-600'
-    }
+  // Create custom truck icon
+  const createTruckIcon = (status: string) => {
+    const iconColor = status === 'in_progress' ? 'blue' : 'green'
+    
+    return new Icon({
+      iconUrl: `data:image/svg+xml;base64,${btoa(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${iconColor}" width="24" height="24">
+          <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm12 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM17 12h-2V9h2v3z"/>
+        </svg>
+      `)}`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+      popupAnchor: [0, -15]
+    })
   }
 
   const getStatusBadge = (status: string) => {
@@ -76,6 +81,21 @@ export function LiveMap({ trips }: LiveMapProps) {
     return `${hours}h ${remainingMinutes}m`
   }
 
+  // Get center point for map based on active trips
+  const getMapCenter = () => {
+    const activeTrips = trips.filter(t => t.status === 'in_progress' && t.current_lat && t.current_lng)
+    
+    if (activeTrips.length === 0) {
+      return [28.6139, 77.2090] // Default to Delhi, India
+    }
+
+    // Calculate average center of all active trips
+    const avgLat = activeTrips.reduce((sum, trip) => sum + (trip.current_lat || 0), 0) / activeTrips.length
+    const avgLng = activeTrips.reduce((sum, trip) => sum + (trip.current_lng || 0), 0) / activeTrips.length
+    
+    return [avgLat, avgLng]
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -96,8 +116,8 @@ export function LiveMap({ trips }: LiveMapProps) {
             <div className="w-full h-96 rounded-lg overflow-hidden border">
               {isClient && (
                 <Map
-                  center={[28.6139, 77.2090]} // Default to Delhi, India
-                  zoom={10}
+                  center={getMapCenter()}
+                  zoom={12}
                   style={{ height: '100%', width: '100%' }}
                   className="z-0"
                 >
@@ -108,23 +128,40 @@ export function LiveMap({ trips }: LiveMapProps) {
                   
                   {trips.map(trip => {
                     if (trip.current_lat && trip.current_lng) {
+                      const truckIcon = createTruckIcon(trip.status)
+                      
                       return (
                         <Marker
                           key={trip.id}
                           position={[trip.current_lat, trip.current_lng]}
+                          icon={truckIcon}
                         >
                           <Popup>
                             <div className="p-2 min-w-[200px]">
-                              <div className="font-semibold mb-2">{trip.driver?.name}</div>
-                              <div className="text-sm text-gray-600">
+                              <div className="font-semibold mb-2 flex items-center">
+                                <User className="h-4 w-4 mr-2 text-blue-600" />
+                                {trip.driver?.name}
+                              </div>
+                              <div className="text-sm text-gray-600 mb-2 flex items-center">
+                                <Car className="h-4 w-4 mr-2 text-gray-600" />
                                 {trip.vehicle?.make} {trip.vehicle?.model}
                               </div>
-                              <div className="text-sm">
+                              <div className="text-sm mb-2">
+                                <span className="font-medium">Route:</span>{' '}
                                 {trip.start_location} → {trip.end_location}
                               </div>
-                              <div className="text-sm mt-1">
+                              <div className="text-sm mb-2">
+                                <span className="font-medium">Distance:</span>{' '}
+                                {trip.distance?.toFixed(1) || '0'} km
+                              </div>
+                              <div className="text-sm">
                                 {getStatusBadge(trip.status)}
                               </div>
+                              {trip.updated_at && (
+                                <div className="text-xs text-gray-500 mt-2">
+                                  Last updated: {new Date(trip.updated_at).toLocaleTimeString()}
+                                </div>
+                              )}
                             </div>
                           </Popup>
                         </Marker>
@@ -176,7 +213,7 @@ export function LiveMap({ trips }: LiveMapProps) {
                     <div className="flex items-center">
                       <Navigation className="h-4 w-4 text-orange-600 mr-2" />
                       <span className="font-medium">Distance:</span>
-                      <span className="ml-2">{trip.distance} km</span>
+                      <span className="ml-2">{trip.distance?.toFixed(1) || '0'} km</span>
                     </div>
                     
                     <div className="flex items-center">
@@ -192,6 +229,11 @@ export function LiveMap({ trips }: LiveMapProps) {
                       <p className="text-xs text-gray-600">
                         Lat: {trip.current_lat.toFixed(6)}, Lng: {trip.current_lng.toFixed(6)}
                       </p>
+                      {trip.updated_at && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Updated: {new Date(trip.updated_at).toLocaleTimeString()}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
