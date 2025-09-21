@@ -1,0 +1,73 @@
+'use client'
+
+import React from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Trip } from '@/types'
+
+interface RecentTripsProps {
+  trips: Trip[]
+}
+
+export function RecentTrips({ trips }: RecentTripsProps) {
+  const recentTrips = trips.slice(0, 5) // Get latest 5 trips
+
+  const getStatusBadge = (status: string) => {
+    const statusColors = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      in_progress: 'bg-blue-100 text-blue-800',
+      completed: 'bg-green-100 text-green-800',
+      cancelled: 'bg-red-100 text-red-800'
+    }
+
+    return (
+      <Badge className={statusColors[status as keyof typeof statusColors]}>
+        {status.replace('_', ' ')}
+      </Badge>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Recent Trips</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Driver</TableHead>
+              <TableHead>Route</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Started</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {recentTrips.map((trip) => (
+              <TableRow key={trip.id}>
+                <TableCell className="font-medium">
+                  {trip.driver?.name || 'Unknown'}
+                </TableCell>
+                <TableCell>
+                  {trip.start_location} → {trip.end_location}
+                </TableCell>
+                <TableCell>
+                  {getStatusBadge(trip.status)}
+                </TableCell>
+                <TableCell>
+                  {new Date(trip.start_time).toLocaleDateString()}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+        {recentTrips.length === 0 && (
+          <div className="text-center py-4 text-gray-500">
+            No recent trips found
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
