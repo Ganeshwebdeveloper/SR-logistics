@@ -1,181 +1,115 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import { User, Vehicle, Trip } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, Users, Car, MapPin, BarChart3 } from 'lucide-react'
-import { toast } from 'sonner'
-import { AddVehicleDialog } from './AddVehicleDialog'
-import { AddDriverDialog } from './AddDriverDialog'
-import { AssignTripDialog } from './AssignTripDialog'
+import { Users, Car, Navigation, Calendar, TrendingUp, AlertCircle } from 'lucide-react'
+import { DashboardStats } from './DashboardStats'
+import { RecentTrips } from './RecentTrips'
 import { VehiclesTable } from './VehiclesTable'
-import { DriversTable } from './DriversTable'
-import { TripsTable } from './TripsTable'
 import { LiveMap } from './LiveMap'
-import { WelcomeBanner } from '../dashboard/WelcomeBanner'
+import { supabase } from '@/lib/supabase'
+import { Trip, Vehicle, User } from '@/types'
+import { toast } from 'sonner'
 
 export function AdminDashboard() {
-  const [vehicles, setVehicles] = useState<Vehicle[]>([])
-  const [drivers, setDrivers] = useState<User[]>([])
   const [trips, setTrips] = useState<Trip[]>([])
-  const [showAddVehicle, setShowAddVehicle] = useState(false)
-  const [showAddDriver, setShowAddDriver] = useState(false)
-  const [showAssignTrip, setShowAssignTrip] = useState(false)
+  const [vehicles, setVehicles] = useState<Vehicle[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+
+  const fetchData = async () => {
+    try {
+      setRefreshing(true)
+      
+      // Fetch trips with related data
+      const { data: tripsData, error: tripsError } = await supabase
+        .from('trips')
+        .select(`
+          *,
+          driver:driver_id(*),
+          vehicle:vehicle_id(*)
+        `)
+        .order('created_at', { ascending: false })
+
+      if (tripsError) throw tripsError
+
+      // Fetch vehicles
+      const { data: vehiclesData, error: vehiclesError } = await supabase
+        .from('vehicles')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (vehiclesError) throw vehiclesError
+
+      // Fetch users
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (usersError) throw usersError
+
+      setTrips(tripsData || [])
+      setVehicles(vehiclesData || [])
+      setUsers(usersData || [])
+    } catch (error: any) {
+      toast.error(error.message || 'Error fetching data')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }
 
   useEffect(() => {
     fetchData()
   }, [])
 
-  const fetchData = async () => {
-    try {
-      const [
-        { data: vehiclesData, error: vehiclesError },
-        { data: driversData, error: driversError },
-        { data: tripsData, error: tripsError }
-      ] = await Promise.all([
-        supabase.from('vehicles').select('*').order('created_at', { ascending: false }),
-        supabase.from('users').select('*').eq('role','driver').order('created_at', { ascending: false }),
-        supabase.from('trips').select('*, driver:users(*), vehicle:vehicles(*)').order('created_at', { ascending: false })
-      ])
-
-      if (vehiclesError) throw vehiclesError
-      if (driversError) throw driversError
-      if (tripsError) throw tripsError
-
-      setVehicles(vehiclesData || [])
-      setDrivers(driversData || [])
-      setTrips(tripsData || [])
-    } catch (error) {
-      toast.error('Error fetching data')
-    } finally {
-      setLoading(false)
-    }
+  const handleRefresh = () => {
+    fetchData()
   }
 
-  const refreshDrivers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('created_at', { ascending: false })
-      
-      if (error) throw error
-      setDrivers(data || [])
-      return true
-    } catch (error) {
-      toast.error('Error refreshing drivers')
-      return false
-    }
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    )
   }
 
-  const stats = [
-    {
-      title: 'Total Vehicles',
-      value: vehicles.length,
-      icon: Car,
-      color: 'text-blue-600'
-    },
-    {
-      title: 'Total Drivers',
-      value: drivers.length,
-      icon: Users,
-      color: 'text-green-600'
-    },
-    {
-      title: 'Ongoing Trips',
-      value: trips.filter(t => t.status === 'in_progress').length,
-      icon: MapPin,
-      color: 'text-orange-600'
-    },
-    {
-      title: 'Completed Trips',
-      value: trips.filter(t => t.status === 'completed').length,
-      icon: BarChart3,
-      color: 'text-purple-600'
-    }
-  ]
+  const activeTrips = trips.filter(trip => trip.status === 'in_progress')
+  const availableVehicles = vehicles.filter(vehicle => vehicle.status === 'available')
+  const activeDrivers = users.filter(user => user.status === 'on_trip')
 
   return (
     <div className="space-y-6">
-      <WelcomeBanner />
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
-          <Card key={index}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-              <stat.icon className={`h-4 w-4 ${stat.color}`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          <span>{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
+        </button>
       </div>
 
-      <div className="flex space-x-4">
-        <Button onClick={() => setShowAddVehicle(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Vehicle
-        </Button>
-        <Button onClick={() => setShowAddDriver(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Driver
-        </Button>
-        <Button variant="outline" onClick={() => setShowAssignTrip(true)}>
-          <MapPin className="h-4 w-4 mr-2" />
-          Assign Trip
-        </Button>
-      </div>
-
-      <Tabs defaultValue="trips" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="trips">Trips</TabsTrigger>
-          <TabsTrigger value="vehicles">Vehicles</TabsTrigger>
-          <TabsTrigger value="drivers">Drivers</TabsTrigger>
-          <TabsTrigger value="map">Live Map</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="trips">
-          <TripsTable trips={trips} />
-        </TabsContent>
-
-        <TabsContent value="vehicles">
-          <VehiclesTable vehicles={vehicles} onRefresh={fetchData} />
-        </TabsContent>
-
-        <TabsContent value="drivers">
-          <DriversTable drivers={drivers} onRefresh={refreshDrivers} />
-        </TabsContent>
-
-        <TabsContent value="map">
-          <LiveMap trips={trips.filter(t => t.status === 'in_progress')} />
-        </TabsContent>
-      </Tabs>
-
-      <AddVehicleDialog
-        open={showAddVehicle}
-        onOpenChange={setShowAddVehicle}
-        onSuccess={fetchData}
-      />
-
-      <AddDriverDialog
-        open={showAddDriver}
-        onOpenChange={setShowAddDriver}
-        onSuccess={fetchData}
-      />
-
-      <AssignTripDialog
-        open={showAssignTrip}
-        onOpenChange={setShowAssignTrip}
+      <DashboardStats 
+        trips={trips}
         vehicles={vehicles}
-        drivers={drivers}
-        onSuccess={fetchData}
+        users={users}
+        activeTrips={activeTrips}
+        availableVehicles={availableVehicles}
+        activeDrivers={activeDrivers}
       />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <LiveMap trips={trips} onRefresh={handleRefresh} />
+        <RecentTrips trips={trips} />
+      </div>
+
+      <VehiclesTable vehicles={vehicles} onRefresh={handleRefresh} />
     </div>
   )
 }
