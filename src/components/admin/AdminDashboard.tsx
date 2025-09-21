@@ -7,6 +7,7 @@ import { Users, Car, Navigation, Calendar, TrendingUp, AlertCircle, RefreshCw } 
 import { DashboardStats } from './DashboardStats'
 import { RecentTrips } from './RecentTrips'
 import { VehiclesTable } from './VehiclesTable'
+import { DriversTable } from './DriversTable'
 import { LiveMap } from './LiveMap'
 import { supabase } from '@/lib/supabase'
 import { Trip, Vehicle, User } from '@/types'
@@ -81,6 +82,7 @@ export function AdminDashboard() {
   const activeTrips = trips.filter(trip => trip.status === 'in_progress')
   const availableVehicles = vehicles.filter(vehicle => vehicle.status === 'available')
   const activeDrivers = users.filter(user => user.status === 'on_trip')
+  const drivers = users.filter(user => user.role === 'driver')
 
   return (
     <div className="space-y-6">
@@ -110,7 +112,10 @@ export function AdminDashboard() {
         <RecentTrips trips={trips} />
       </div>
 
-      <VehiclesTable vehicles={vehicles} onRefresh={handleRefresh} />
+      <div className="grid grid-cols-1 gap-6">
+        <DriversTable drivers={drivers} onRefresh={handleRefresh} />
+        <VehiclesTable vehicles={vehicles} onRefresh={handleRefresh} />
+      </div>
     </div>
   )
 }
