@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, Car, Navigation, Calendar, TrendingUp, AlertCircle } from 'lucide-react'
+import { Users, Car, Navigation, Calendar, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react'
 import { DashboardStats } from './DashboardStats'
 import { RecentTrips } from './RecentTrips'
 import { VehiclesTable } from './VehiclesTable'
