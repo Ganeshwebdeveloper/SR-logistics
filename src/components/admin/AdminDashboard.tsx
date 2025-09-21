@@ -66,7 +66,7 @@ export function AdminDashboard() {
   useEffect(() => {
     fetchData()
 
-    // Set up real-time subscription for trip location updates
+    // Set up real-time subscription for trip updates
     const tripChannel = supabase
       .channel('trip-location-updates')
       .on(
@@ -75,13 +75,24 @@ export function AdminDashboard() {
           event: 'UPDATE',
           schema: 'public',
           table: 'trips',
-          filter: 'current_lat=not.is.null'
         },
         (payload) => {
           // Update the specific trip in our state
           setTrips(prev => prev.map(trip => 
             trip.id === payload.new.id ? { ...trip, ...payload.new } : trip
           ))
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'trips',
+        },
+        (payload) => {
+          // Add new trip to our state
+          setTrips(prev => [payload.new as Trip, ...prev])
         }
       )
       .subscribe()
