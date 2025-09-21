@@ -81,7 +81,7 @@ export function AdminDashboard() {
 
   const activeTrips = trips.filter(trip => trip.status === 'in_progress')
   const availableVehicles = vehicles.filter(vehicle => vehicle.status === 'available')
-  const activeDrivers = users.filter(user => user.status === 'on_trip')
+  const availableDrivers = users.filter(user => user.status === 'available')
   const drivers = users.filter(user => user.role === 'driver')
 
   return (
@@ -109,7 +109,7 @@ export function AdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <LiveMap trips={trips} onRefresh={handleRefresh} />
-        <RecentTrips trips={trips} />
+        <RecentTrips trips={trips} onRefresh={handleRefresh} />
       </div>
 
       <div className="grid grid-cols-1 gap-6">

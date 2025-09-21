@@ -1,16 +1,21 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Trip } from '@/types'
+import { Button } from '@/components/ui/button'
+import { Plus } from 'lucide-react'
+import { AssignTripDialog } from './AssignTripDialog'
 
 interface RecentTripsProps {
   trips: Trip[]
+  onRefresh: () => void
 }
 
-export function RecentTrips({ trips }: RecentTripsProps) {
+export function RecentTrips({ trips, onRefresh }: RecentTripsProps) {
+  const [showAssignTripDialog, setShowAssignTripDialog] = useState(false)
   const recentTrips = trips.slice(0, 5) // Get latest 5 trips
 
   const getStatusBadge = (status: string) => {
@@ -29,45 +34,57 @@ export function RecentTrips({ trips }: RecentTripsProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Recent Trips</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Driver</TableHead>
-              <TableHead>Route</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Started</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {recentTrips.map((trip) => (
-              <TableRow key={trip.id}>
-                <TableCell className="font-medium">
-                  {trip.driver?.name || 'Unknown'}
-                </TableCell>
-                <TableCell>
-                  {trip.start_location} → {trip.end_location}
-                </TableCell>
-                <TableCell>
-                  {getStatusBadge(trip.status)}
-                </TableCell>
-                <TableCell>
-                  {new Date(trip.start_time).toLocaleDateString()}
-                </TableCell>
+    <>
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle>Recent Trips</CardTitle>
+          <Button size="sm" onClick={() => setShowAssignTripDialog(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Assign Trip
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Driver</TableHead>
+                <TableHead>Route</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Started</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        {recentTrips.length === 0 && (
-          <div className="text-center py-4 text-gray-500">
-            No recent trips found
-          </div>
-        )}
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {recentTrips.map((trip) => (
+                <TableRow key={trip.id}>
+                  <TableCell className="font-medium">
+                    {trip.driver?.name || 'Unknown'}
+                  </TableCell>
+                  <TableCell>
+                    {trip.start_location} → {trip.end_location}
+                  </TableCell>
+                  <TableCell>
+                    {getStatusBadge(trip.status)}
+                  </TableCell>
+                  <TableCell>
+                    {new Date(trip.start_time).toLocaleDateString()}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          {recentTrips.length === 0 && (
+            <div className="text-center py-4 text-gray-500">
+              No recent trips found
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <AssignTripDialog
+        open={showAssignTripDialog}
+        onOpenChange={setShowAssignTripDialog}
+        onSuccess={onRefresh}
+      />
+    </>
   )
 }
