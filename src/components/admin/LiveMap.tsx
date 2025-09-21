@@ -10,7 +10,14 @@ import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 
 // Dynamically import the Map component to avoid SSR issues
-const Map = dynamic(() => import('@/components/Map'), { ssr: false })
+const Map = dynamic(() => import('@/components/Map'), { 
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+  )
+})
 
 interface LiveMapProps {
   trips: Trip[]
@@ -41,7 +48,7 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
     .filter(trip => trip.current_lat && trip.current_lng)
     .map(trip => ({
       id: trip.id,
-      position: [trip.current_lat, trip.current_lng],
+      position: [trip.current_lat!, trip.current_lng!] as [number, number],
       popupContent: (
         <div className="p-2">
           <h3 className="font-bold">{trip.driver?.name || 'Unknown Driver'}</h3>
