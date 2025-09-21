@@ -32,46 +32,43 @@ interface LiveMapProps {
   trips: Trip[]
 }
 
-// Custom truck icon component
-const TruckIcon = ({ status }: { status: string }) => {
-  const [isClient, setIsClient] = useState(false)
-  const [IconComponent, setIconComponent] = useState<any>(null)
-
-  useEffect(() => {
-    setIsClient(true)
-    if (isClient) {
-      import('react-leaflet').then((mod) => {
-        const L = mod as any
-        const iconColor = status === 'in_progress' ? 'blue' : 'green'
-        
-        const truckIcon = new L.Icon({
-          iconUrl: `data:image/svg+xml;base64,${btoa(`
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${iconColor}" width="24" height="24">
-              <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm12 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM17 12h-2V9h2v3z"/>
-            </svg>
-          `)}`,
-          iconSize: [30, 30],
-          iconAnchor: [15, 15],
-          popupAnchor: [0, -15]
-        })
-        setIconComponent(truckIcon)
-      })
-    }
-  }, [isClient, status])
-
-  if (!isClient || !IconComponent) {
-    return null
-  }
-
-  return IconComponent
+// Custom truck icon - simplified without hooks
+const createTruckIcon = (status: string) => {
+  if (typeof window === 'undefined') return null
+  
+  const L = require('leaflet')
+  const iconColor = status === 'in_progress' ? 'blue' : 'green'
+  
+  return new L.Icon({
+    iconUrl: `data:image/svg+xml;base64,${Buffer.from(`
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${iconColor}" width="24" height="24">
+        <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm12 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM17 12h-2V9h2v3z"/>
+      </svg>
+    `).toString('base64')}`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -15]
+  })
 }
 
 export function LiveMap({ trips }: LiveMapProps) {
   const [isClient, setIsClient] = useState(false)
+  const [truckIcons, setTruckIcons] = useState<Record<string, any>>({})
 
   useEffect(() => {
     setIsClient(true)
-  }, [])
+    
+    // Create icons on client side only
+    if (typeof window !== 'undefined') {
+      const icons: Record<string, any> = {}
+      trips.forEach(trip => {
+        if (trip.status) {
+          icons[trip.status] = createTruckIcon(trip.status)
+        }
+      })
+      setTruckIcons(icons)
+    }
+  }, [trips])
 
   const getStatusBadge = (status: string) => {
     const statusColors = {
@@ -158,12 +155,15 @@ export function LiveMap({ trips }: LiveMapProps) {
                 />
                 
                 {trips.map(trip => {
-                  if (trip.current_lat && trip.current_lng) {
+                  if (trip.current_lat && trip.current_lng && trip.status) {
+                    const icon = truckIcons[trip.status]
+                    if (!icon) return null
+                    
                     return (
                       <Marker
                         key={trip.id}
                         position={[trip.current_lat, trip.current_lng]}
-                        icon={TruckIcon({ status: trip.status })}
+                        icon={icon}
                       >
                         <Popup>
                           <div className="p-2 min-w-[200px]">
