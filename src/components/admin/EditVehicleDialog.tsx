@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Vehicle } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -20,12 +20,25 @@ interface EditVehicleDialogProps {
 export function EditVehicleDialog({ open, onOpenChange, vehicle, onSuccess }: EditVehicleDialogProps) {
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    make: vehicle.make,
-    model: vehicle.model,
-    year: vehicle.year,
-    license_plate: vehicle.license_plate,
-    status: vehicle.status
+    make: '',
+    model: '',
+    year: 0,
+    license_plate: '',
+    status: 'available' as const
   })
+
+  // Reset form data when vehicle prop changes
+  useEffect(() => {
+    if (vehicle) {
+      setFormData({
+        make: vehicle.make,
+        model: vehicle.model,
+        year: vehicle.year,
+        license_plate: vehicle.license_plate,
+        status: vehicle.status
+      })
+    }
+  }, [vehicle])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
