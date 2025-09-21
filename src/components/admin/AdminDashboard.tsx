@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Users, Car, Navigation, Calendar, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react'
 import { DashboardStats } from './DashboardStats'
 import { RecentTrips } from './RecentTrips'
