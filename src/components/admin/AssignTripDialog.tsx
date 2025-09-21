@@ -82,8 +82,9 @@ export function AssignTripDialog({ open, onOpenChange, vehicles, drivers, onSucc
     }
   }
 
-  const availableVehicles = vehicles.filter(v => v.status === 'available')
-  const availableDrivers = drivers.filter(d => d.status === 'available')
+  // Add safe access to drivers and vehicles arrays
+  const availableVehicles = vehicles?.filter(v => v.status === 'available') || []
+  const availableDrivers = drivers?.filter(d => d.status === 'available') || []
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -114,6 +115,9 @@ export function AssignTripDialog({ open, onOpenChange, vehicles, drivers, onSucc
                 ))}
               </SelectContent>
             </Select>
+            {availableDrivers.length === 0 && (
+              <p className="text-sm text-red-500">No available drivers found</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -134,6 +138,9 @@ export function AssignTripDialog({ open, onOpenChange, vehicles, drivers, onSucc
                 ))}
               </SelectContent>
             </Select>
+            {availableVehicles.length === 0 && (
+              <p className="text-sm text-red-500">No available vehicles found</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -176,7 +183,7 @@ export function AssignTripDialog({ open, onOpenChange, vehicles, drivers, onSucc
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading || availableDrivers.length === 0 || availableVehicles.length === 0}>
               {loading ? 'Assigning...' : 'Assign Trip'}
             </Button>
           </div>

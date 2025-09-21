@@ -83,7 +83,7 @@ export function AdminDashboard() {
   const availableVehicles = vehicles.filter(vehicle => vehicle.status === 'available')
   const availableDrivers = users.filter(user => user.status === 'available')
   const drivers = users.filter(user => user.role === 'driver')
-  const activeDrivers = users.filter(user => user.status === 'on_trip') // Added missing variable
+  const activeDrivers = users.filter(user => user.status === 'on_trip')
 
   return (
     <div className="space-y-6">
@@ -110,7 +110,12 @@ export function AdminDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <LiveMap trips={trips} onRefresh={handleRefresh} />
-        <RecentTrips trips={trips} onRefresh={handleRefresh} />
+        <RecentTrips 
+          trips={trips} 
+          drivers={drivers}
+          vehicles={vehicles}
+          onRefresh={handleRefresh} 
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-6">

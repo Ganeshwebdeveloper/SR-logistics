@@ -4,17 +4,19 @@ import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Trip } from '@/types'
+import { Trip, User, Vehicle } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { AssignTripDialog } from './AssignTripDialog'
 
 interface RecentTripsProps {
   trips: Trip[]
+  drivers: User[]
+  vehicles: Vehicle[]
   onRefresh: () => void
 }
 
-export function RecentTrips({ trips, onRefresh }: RecentTripsProps) {
+export function RecentTrips({ trips, drivers, vehicles, onRefresh }: RecentTripsProps) {
   const [showAssignTripDialog, setShowAssignTripDialog] = useState(false)
   const recentTrips = trips.slice(0, 5) // Get latest 5 trips
 
@@ -83,6 +85,8 @@ export function RecentTrips({ trips, onRefresh }: RecentTripsProps) {
       <AssignTripDialog
         open={showAssignTripDialog}
         onOpenChange={setShowAssignTripDialog}
+        vehicles={vehicles}
+        drivers={drivers}
         onSuccess={onRefresh}
       />
     </>
