@@ -8,6 +8,13 @@
 .leaflet-container {
   height: 100%;
   width: 100%;
+  z-index: 1;
+}
+
+/* Ensure map containers have proper dimensions */
+.map-container {
+  height: 400px;
+  min-height: 300px;
 }
 
 @layer base {

@@ -49,6 +49,7 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
     .map(trip => ({
       id: trip.id,
       position: [trip.current_lat!, trip.current_lng!] as [number, number],
+      driverName: trip.driver?.name || 'Unknown Driver',
       popupContent: (
         <div className="p-2">
           <h3 className="font-bold">{trip.driver?.name || 'Unknown Driver'}</h3>
@@ -73,7 +74,7 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 p-0">
+      <CardContent className="flex-1 p-0 flex flex-col">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -87,11 +88,12 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
             </p>
           </div>
         ) : (
-          <div className="h-80 w-full">
+          <div className="flex-1 min-h-80">
             <Map 
               markers={mapMarkers}
               center={[0, 0]}
               zoom={2}
+              showStats={true}
             />
           </div>
         )}
