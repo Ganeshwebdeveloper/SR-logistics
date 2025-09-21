@@ -83,6 +83,7 @@ export function AdminDashboard() {
   const availableVehicles = vehicles.filter(vehicle => vehicle.status === 'available')
   const availableDrivers = users.filter(user => user.status === 'available')
   const drivers = users.filter(user => user.role === 'driver')
+  const activeDrivers = users.filter(user => user.status === 'on_trip') // Added missing variable
 
   return (
     <div className="space-y-6">
