@@ -6,13 +6,21 @@ import { supabase } from '@/lib/supabase'
 
 interface GPSTrackerProps {
   tripId: string
+  autoStart?: boolean
   onLocationUpdate?: (lat: number, lng: number) => void
 }
 
-export function GPSTracker({ tripId, onLocationUpdate }: GPSTrackerProps) {
+export function GPSTracker({ tripId, autoStart = false, onLocationUpdate }: GPSTrackerProps) {
   const [watchId, setWatchId] = useState<number | null>(null)
   const [isTracking, setIsTracking] = useState(false)
   const [lastPosition, setLastPosition] = useState<GeolocationPosition | null>(null)
+
+  // Auto-start tracking when component mounts if autoStart is true
+  useEffect(() => {
+    if (autoStart) {
+      startTracking()
+    }
+  }, [autoStart])
 
   // Function to update trip location in database
   const updateTripLocation = async (lat: number, lng: number) => {
@@ -63,8 +71,8 @@ export function GPSTracker({ tripId, onLocationUpdate }: GPSTrackerProps) {
       handleLocationError,
       {
         enableHighAccuracy: true,
-        maximumAge: 30000, // 30 seconds
-        timeout: 27000 // 27 seconds
+        maximumAge: 10000, // 10 seconds
+        timeout: 15000 // 15 seconds
       }
     )
 
@@ -101,16 +109,18 @@ export function GPSTracker({ tripId, onLocationUpdate }: GPSTrackerProps) {
             {isTracking ? 'Tracking your location...' : 'Location tracking is off'}
           </p>
         </div>
-        <button
-          onClick={isTracking ? stopTracking : startTracking}
-          className={`px-4 py-2 rounded-md text-sm font-medium ${
-            isTracking
-              ? 'bg-red-100 text-red-700 hover:bg-red-200'
-              : 'bg-green-100 text-green-700 hover:bg-green-200'
-          }`}
-        >
-          {isTracking ? 'Stop Tracking' : 'Start Tracking'}
-        </button>
+        {!autoStart && (
+          <button
+            onClick={isTracking ? stopTracking : startTracking}
+            className={`px-4 py-2 rounded-md text-sm font-medium ${
+              isTracking
+                ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                : 'bg-green-100 text-green-700 hover:bg-green-200'
+            }`}
+          >
+            {isTracking ? 'Stop Tracking' : 'Start Tracking'}
+          </button>
+        )}
       </div>
 
       {lastPosition && (

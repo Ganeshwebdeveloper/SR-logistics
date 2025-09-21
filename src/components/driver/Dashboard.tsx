@@ -274,6 +274,7 @@ export function DriverDashboard({ driverId }: DriverDashboardProps) {
             {activeTrip.status === 'in_progress' && (
               <GPSTracker 
                 tripId={activeTrip.id} 
+                autoStart={true}
                 onLocationUpdate={(lat, lng) => {
                   // Update the local trip data with new location
                   setActiveTrip(prev => prev ? {
