@@ -232,7 +232,7 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
       // Update driver status to available
       await updateDriverStatus('available')
       
-      // Update vehicle status to available
+      // Update vehicle status to available (not completed)
       const { error: vehicleError } = await supabase
         .from('vehicles')
         .update({ status: 'available' })
