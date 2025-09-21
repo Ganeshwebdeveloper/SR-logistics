@@ -15,6 +15,7 @@ import { Vehicle } from '@/types'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { EditVehicleDialog } from './EditVehicleDialog'
 
 interface VehiclesTableProps {
   vehicles: Vehicle[]
@@ -23,23 +24,28 @@ interface VehiclesTableProps {
 
 export function VehiclesTable({ vehicles, onRefresh }: VehiclesTableProps) {
   const [loading, setLoading] = useState(false)
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null)
+  const [showEditDialog, setShowEditDialog] = useState(false)
 
-  const handleEdit = async (vehicle: Vehicle) => {
-    setLoading(true)
-    try {
-      // Show edit dialog or implement edit functionality
-      toast.info('Edit vehicle functionality will be implemented')
-      // For now, just refresh to show we're working on it
-      await onRefresh()
-    } catch (error) {
-      toast.error('Error editing vehicle')
-    } finally {
-      setLoading(false)
-    }
+  const handleEdit = (vehicle: Vehicle) => {
+    setEditingVehicle(vehicle)
+    setShowEditDialog(true)
   }
 
   const handleDelete = async (vehicleId: string) => {
     try {
+      // Check if vehicle is currently in use
+      const { data: activeTrips } = await supabase
+        .from('trips')
+        .select('*')
+        .eq('vehicle_id', vehicleId)
+        .in('status', ['pending', 'in_progress'])
+
+      if (activeTrips && activeTrips.length > 0) {
+        toast.error('Cannot delete vehicle with active trips')
+        return
+      }
+
       const { error } = await supabase
         .from('vehicles')
         .delete()
@@ -130,6 +136,15 @@ export function VehiclesTable({ vehicles, onRefresh }: VehiclesTableProps) {
           ))}
         </TableBody>
       </Table>
+
+      {editingVehicle && (
+        <EditVehicleDialog
+          open={showEditDialog}
+          onOpenChange={setShowEditDialog}
+          vehicle={editingVehicle}
+          onSuccess={onRefresh}
+        />
+      )}
     </div>
   )
 }
