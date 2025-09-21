@@ -28,12 +28,42 @@ const Popup = dynamic(() => import('react-leaflet').then((mod) => mod.Popup), {
   ssr: false
 })
 
-const Icon = dynamic(() => import('react-leaflet').then((mod) => mod.Icon), {
-  ssr: false
-})
-
 interface LiveMapProps {
   trips: Trip[]
+}
+
+// Custom truck icon component
+const TruckIcon = ({ status }: { status: string }) => {
+  const [isClient, setIsClient] = useState(false)
+  const [IconComponent, setIconComponent] = useState<any>(null)
+
+  useEffect(() => {
+    setIsClient(true)
+    if (isClient) {
+      import('react-leaflet').then((mod) => {
+        const L = mod as any
+        const iconColor = status === 'in_progress' ? 'blue' : 'green'
+        
+        const truckIcon = new L.Icon({
+          iconUrl: `data:image/svg+xml;base64,${btoa(`
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${iconColor}" width="24" height="24">
+              <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm12 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM17 12h-2V9h2v3z"/>
+            </svg>
+          `)}`,
+          iconSize: [30, 30],
+          iconAnchor: [15, 15],
+          popupAnchor: [0, -15]
+        })
+        setIconComponent(truckIcon)
+      })
+    }
+  }, [isClient, status])
+
+  if (!isClient || !IconComponent) {
+    return null
+  }
+
+  return IconComponent
 }
 
 export function LiveMap({ trips }: LiveMapProps) {
@@ -42,22 +72,6 @@ export function LiveMap({ trips }: LiveMapProps) {
   useEffect(() => {
     setIsClient(true)
   }, [])
-
-  // Create custom truck icon
-  const createTruckIcon = (status: string) => {
-    const iconColor = status === 'in_progress' ? 'blue' : 'green'
-    
-    return new Icon({
-      iconUrl: `data:image/svg+xml;base64,${btoa(`
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${iconColor}" width="24" height="24">
-          <path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm12 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM17 12h-2V9h2v3z"/>
-        </svg>
-      `)}`,
-      iconSize: [30, 30],
-      iconAnchor: [15, 15],
-      popupAnchor: [0, -15]
-    })
-  }
 
   const getStatusBadge = (status: string) => {
     const statusColors = {
@@ -96,6 +110,24 @@ export function LiveMap({ trips }: LiveMapProps) {
     return [avgLat, avgLng]
   }
 
+  if (!isClient) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <MapIcon className="h-5 w-5 mr-2" />
+            Live Trip Tracking
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="w-full h-96 bg-gray-200 flex items-center justify-center">
+            <div className="text-gray-600">Loading map...</div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -114,63 +146,59 @@ export function LiveMap({ trips }: LiveMapProps) {
           <>
             {/* Map Section */}
             <div className="w-full h-96 rounded-lg overflow-hidden border">
-              {isClient && (
-                <Map
-                  center={getMapCenter()}
-                  zoom={12}
-                  style={{ height: '100%', width: '100%' }}
-                  className="z-0"
-                >
-                  <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  />
-                  
-                  {trips.map(trip => {
-                    if (trip.current_lat && trip.current_lng) {
-                      const truckIcon = createTruckIcon(trip.status)
-                      
-                      return (
-                        <Marker
-                          key={trip.id}
-                          position={[trip.current_lat, trip.current_lng]}
-                          icon={truckIcon}
-                        >
-                          <Popup>
-                            <div className="p-2 min-w-[200px]">
-                              <div className="font-semibold mb-2 flex items-center">
-                                <User className="h-4 w-4 mr-2 text-blue-600" />
-                                {trip.driver?.name}
-                              </div>
-                              <div className="text-sm text-gray-600 mb-2 flex items-center">
-                                <Car className="h-4 w-4 mr-2 text-gray-600" />
-                                {trip.vehicle?.make} {trip.vehicle?.model}
-                              </div>
-                              <div className="text-sm mb-2">
-                                <span className="font-medium">Route:</span>{' '}
-                                {trip.start_location} → {trip.end_location}
-                              </div>
-                              <div className="text-sm mb-2">
-                                <span className="font-medium">Distance:</span>{' '}
-                                {trip.distance?.toFixed(1) || '0'} km
-                              </div>
-                              <div className="text-sm">
-                                {getStatusBadge(trip.status)}
-                              </div>
-                              {trip.updated_at && (
-                                <div className="text-xs text-gray-500 mt-2">
-                                  Last updated: {new Date(trip.updated_at).toLocaleTimeString()}
-                                </div>
-                              )}
+              <Map
+                center={getMapCenter()}
+                zoom={12}
+                style={{ height: '100%', width: '100%' }}
+                className="z-0"
+              >
+                <TileLayer
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                />
+                
+                {trips.map(trip => {
+                  if (trip.current_lat && trip.current_lng) {
+                    return (
+                      <Marker
+                        key={trip.id}
+                        position={[trip.current_lat, trip.current_lng]}
+                        icon={TruckIcon({ status: trip.status })}
+                      >
+                        <Popup>
+                          <div className="p-2 min-w-[200px]">
+                            <div className="font-semibold mb-2 flex items-center">
+                              <User className="h-4 w-4 mr-2 text-blue-600" />
+                              {trip.driver?.name}
                             </div>
-                          </Popup>
-                        </Marker>
-                      )
-                    }
-                    return null
-                  })}
-                </Map>
-              )}
+                            <div className="text-sm text-gray-600 mb-2 flex items-center">
+                              <Car className="h-4 w-4 mr-2 text-gray-600" />
+                              {trip.vehicle?.make} {trip.vehicle?.model}
+                            </div>
+                            <div className="text-sm mb-2">
+                              <span className="font-medium">Route:</span>{' '}
+                              {trip.start_location} → {trip.end_location}
+                            </div>
+                            <div className="text-sm mb-2">
+                              <span className="font-medium">Distance:</span>{' '}
+                              {trip.distance?.toFixed(1) || '0'} km
+                            </div>
+                            <div className="text-sm">
+                              {getStatusBadge(trip.status)}
+                            </div>
+                            {trip.updated_at && (
+                              <div className="text-xs text-gray-500 mt-2">
+                                Last updated: {new Date(trip.updated_at).toLocaleTimeString()}
+                              </div>
+                            )}
+                          </div>
+                        </Popup>
+                      </Marker>
+                    )
+                  }
+                  return null
+                })}
+              </Map>
             </div>
 
             {/* Trip Details Section */}
