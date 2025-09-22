@@ -102,6 +102,9 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
             <h3 className="font-bold">{trip.driver?.name || 'Unknown Driver'}</h3>
             <p className="text-sm">Trip: {trip.start_location} → {trip.end_location}</p>
             <p className="text-xs text-gray-500">
+              Distance: {trip.distance?.toFixed(2) || '0'} km
+            </p>
+            <p className="text-xs text-gray-500">
               Updated: {new Date(trip.updated_at).toLocaleTimeString()}
             </p>
             <p className="text-xs text-gray-500">
@@ -194,8 +197,11 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
                     <span className="text-gray-500 text-xs block">
                       {trip.start_location} → {trip.end_location}
                     </span>
+                    <span className="text-gray-400 text-xs">
+                      {trip.distance?.toFixed(1) || '0'} km
+                    </span>
                     {trip.current_lat && trip.current_lng && (
-                      <span className="text-gray-400 text-xs">
+                      <span className="text-gray-400 text-xs block">
                         {trip.current_lat.toFixed(4)}, {trip.current_lng.toFixed(4)}
                       </span>
                     )}

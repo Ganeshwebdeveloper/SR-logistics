@@ -21,6 +21,8 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
   const [gpsPermission, setGpsPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt')
   const [gpsError, setGpsError] = useState<string>('')
   const [watchId, setWatchId] = useState<number | null>(null)
+  const [speed, setSpeed] = useState(0)
+  const [lastPosition, setLastPosition] = useState<GeolocationPosition | null>(null)
 
   useEffect(() => {
     if (trip.status === 'in_progress') {
@@ -47,6 +49,19 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
       Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c; // Distance in kilometers
+  }
+
+  // Calculate speed based on distance and time
+  const calculateSpeed = (prevPosition: GeolocationPosition, currentPosition: GeolocationPosition): number => {
+    const distance = calculateDistance(
+      prevPosition.coords.latitude,
+      prevPosition.coords.longitude,
+      currentPosition.coords.latitude,
+      currentPosition.coords.longitude
+    );
+    
+    const timeDiff = (currentPosition.timestamp - prevPosition.timestamp) / 1000 / 3600; // hours
+    return timeDiff > 0 ? distance / timeDiff : 0; // km/h
   }
 
   const calculateTotalDistance = async () => {
@@ -135,17 +150,22 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
         const newLocation = { lat: latitude, lng: longitude }
         
         // Calculate distance traveled if we have a previous location
-        if (currentLocation) {
+        if (lastPosition) {
           const newDistance = calculateDistance(
-            currentLocation.lat,
-            currentLocation.lng,
+            lastPosition.coords.latitude,
+            lastPosition.coords.longitude,
             latitude,
             longitude
           )
           setDistanceTraveled(prev => prev + newDistance)
+          
+          // Calculate speed
+          const calculatedSpeed = calculateSpeed(lastPosition, position);
+          setSpeed(calculatedSpeed);
         }
         
         setCurrentLocation(newLocation)
+        setLastPosition(position)
         updateTripLocation(latitude, longitude)
         setGpsError('')
       },
@@ -202,12 +222,15 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
     }
   }
 
-  const updateDistanceInDatabase = async () => {
+  const sendLocationDetailsToAdmin = async () => {
     setUpdating(true)
     try {
+      // Update trip with all details
       const { error } = await supabase
         .from('trips')
         .update({ 
+          current_lat: currentLocation?.lat,
+          current_lng: currentLocation?.lng,
           distance: distanceTraveled,
           updated_at: new Date().toISOString()
         })
@@ -215,10 +238,13 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
 
       if (error) throw error
       
-      toast.success('Distance updated successfully')
+      // Show toast with all details
+      toast.success('Location details sent to admin', {
+        description: `Lat: ${currentLocation?.lat.toFixed(6)}, Lng: ${currentLocation?.lng.toFixed(6)}, Speed: ${speed.toFixed(2)} km/h, Distance: ${distanceTraveled.toFixed(2)} km`
+      })
     } catch (error: any) {
-      console.error('Error updating distance:', error)
-      toast.error('Error updating distance: ' + (error.message || 'Unknown error'))
+      console.error('Error sending location details:', error)
+      toast.error('Error sending location details: ' + (error.message || 'Unknown error'))
     } finally {
       setUpdating(false)
     }
@@ -227,7 +253,7 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
   const handleCompleteTrip = async () => {
     try {
       // Update final distance
-      await updateDistanceInDatabase()
+      await sendLocationDetailsToAdmin()
       
       // Update driver status to available
       await updateDriverStatus('available')
@@ -323,7 +349,7 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
               <span className="font-medium">Traveled:</span> {distanceTraveled.toFixed(1)} km
             </div>
             <div>
-              <span className="font-medium">Status:</span> In Progress
+              <span className="font-medium">Current Speed:</span> {speed.toFixed(2)} km/h
             </div>
             <div>
               <span className="font-medium">Progress:</span> {calculateProgress()}%
@@ -387,13 +413,13 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
 
         <div className="flex space-x-2">
           <Button 
-            onClick={updateDistanceInDatabase} 
+            onClick={sendLocationDetailsToAdmin} 
             disabled={updating}
             variant="outline"
             className="flex-1"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${updating ? 'animate-spin' : ''}`} />
-            {updating ? 'Updating...' : 'Update Distance'}
+            {updating ? 'Sending...' : 'Send Location Details'}
           </Button>
           <Button onClick={handleCompleteTrip} className="flex-1 bg-green-600 hover:bg-green-700">
             Complete Trip
