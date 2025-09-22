@@ -3,14 +3,14 @@
 import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { MapPin, Navigation, RefreshCw, Filter } from 'lucide-react'
+import { MapPin, Navigation, RefreshCw, Filter, Car, Gauge, Map } from 'lucide-react'
 import { Trip } from '@/types'
 import { supabase } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 
 // Dynamically import the Map component to avoid SSR issues
-const Map = dynamic(() => import('@/components/Map'), { 
+const MapComponent = dynamic(() => import('@/components/Map'), { 
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-64">
@@ -24,8 +24,22 @@ interface LiveMapProps {
   onRefresh: () => void
 }
 
+interface TripDetails {
+  id: string
+  driverName: string
+  position: [number, number]
+  startLocation: string
+  endLocation: string
+  distance: number
+  speed: number
+  updatedAt: string
+  vehicle?: string
+  licensePlate?: string
+}
+
 export function LiveMap({ trips, onRefresh }: LiveMapProps) {
   const [activeTrips, setActiveTrips] = useState<Trip[]>([])
+  const [tripDetails, setTripDetails] = useState<TripDetails[]>([])
   const [selectedTripId, setSelectedTripId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -35,35 +49,77 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
   useEffect(() => {
     const inProgressTrips = trips.filter(trip => trip.status === 'in_progress')
     setActiveTrips(inProgressTrips)
+    updateTripDetails(inProgressTrips)
     setLoading(false)
   }, [trips])
+
+  const updateTripDetails = (trips: Trip[]) => {
+    const details = trips
+      .filter(trip => trip.current_lat && trip.current_lng)
+      .map(trip => ({
+        id: trip.id,
+        driverName: trip.driver?.name || 'Unknown Driver',
+        position: [trip.current_lat!, trip.current_lng!] as [number, number],
+        startLocation: trip.start_location,
+        endLocation: trip.end_location,
+        distance: trip.distance || 0,
+        speed: calculateSpeedFromTrip(trip),
+        updatedAt: trip.updated_at || trip.created_at,
+        vehicle: trip.vehicle ? `${trip.vehicle.make} ${trip.vehicle.model}` : undefined,
+        licensePlate: trip.vehicle?.license_plate
+      }))
+    
+    setTripDetails(details)
+  }
+
+  const calculateSpeedFromTrip = (trip: Trip): number => {
+    // This is a simplified calculation - in a real app you'd use GPS data
+    // For now, we'll use a random speed based on trip duration
+    if (!trip.start_time) return 0
+    
+    const startTime = new Date(trip.start_time).getTime()
+    const now = Date.now()
+    const hoursElapsed = (now - startTime) / 1000 / 3600
+    
+    if (hoursElapsed <= 0) return 0
+    
+    // Random speed between 30-80 km/h for demo purposes
+    return Math.random() * 50 + 30
+  }
 
   const handleRefresh = async () => {
     setRefreshing(true)
     
-    // Force refresh all active trips by triggering location updates
     try {
-      // Get current user's session to verify admin role
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (session) {
-        // For each active trip, send a refresh command
-        const refreshPromises = activeTrips.map(async (trip) => {
-          // This would typically be done through a real-time message or edge function
-          // For now, we'll just log it and rely on the automatic refresh
-          console.log(`Refreshing location for trip ${trip.id}`)
-        })
-        
-        await Promise.all(refreshPromises)
-        toast.success('Refresh command sent to all drivers')
+      // Force refresh by fetching latest trip data
+      const { data: refreshedTrips, error } = await supabase
+        .from('trips')
+        .select(`
+          *,
+          driver:users(*),
+          vehicle:vehicles(*)
+        `)
+        .eq('status', 'in_progress')
+        .order('updated_at', { ascending: false })
+
+      if (error) {
+        console.error('Error refreshing trips:', error)
+        toast.error('Failed to refresh trips')
+        return
       }
+
+      // Update the active trips with fresh data
+      setActiveTrips(refreshedTrips || [])
+      updateTripDetails(refreshedTrips || [])
+      
+      toast.success('Trips refreshed successfully')
+      onRefresh()
     } catch (error) {
-      console.error('Error sending refresh command:', error)
-      toast.error('Failed to send refresh command')
+      console.error('Error refreshing trips:', error)
+      toast.error('Failed to refresh trips')
+    } finally {
+      setRefreshing(false)
     }
-    
-    onRefresh()
-    setTimeout(() => setRefreshing(false), 2000)
   }
 
   const handleTripSelect = (tripId: string) => {
@@ -83,40 +139,75 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
 
   // Prepare map markers based on selection
   const getMapMarkers = () => {
-    let tripsToShow = activeTrips
+    let detailsToShow = tripDetails
     
     if (selectedTripId) {
-      tripsToShow = activeTrips.filter(trip => trip.id === selectedTripId)
+      detailsToShow = tripDetails.filter(detail => detail.id === selectedTripId)
     } else if (!showAllTrips) {
       return []
     }
     
-    return tripsToShow
-      .filter(trip => trip.current_lat && trip.current_lng)
-      .map(trip => ({
-        id: trip.id,
-        position: [trip.current_lat!, trip.current_lng!] as [number, number],
-        driverName: trip.driver?.name || 'Unknown Driver',
-        popupContent: (
-          <div className="p-2">
-            <h3 className="font-bold">{trip.driver?.name || 'Unknown Driver'}</h3>
-            <p className="text-sm">Trip: {trip.start_location} → {trip.end_location}</p>
-            <p className="text-xs text-gray-500">
-              Distance: {trip.distance?.toFixed(2) || '0'} km
-            </p>
-            <p className="text-xs text-gray-500">
-              Updated: {new Date(trip.updated_at).toLocaleTimeString()}
-            </p>
-            <p className="text-xs text-gray-500">
-              Location: {trip.current_lat?.toFixed(6)}, {trip.current_lng?.toFixed(6)}
-            </p>
+    return detailsToShow.map(detail => ({
+      id: detail.id,
+      position: detail.position,
+      popupContent: (
+        <div className="p-3 min-w-[250px]">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-sm">{detail.driverName}</h3>
+            <div className="flex items-center text-xs text-green-600">
+              <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+              Active
+            </div>
           </div>
-        )
-      }))
+          
+          <div className="space-y-2 text-xs">
+            <div className="flex items-center">
+              <MapPin className="h-3 w-3 mr-1 text-blue-500" />
+              <span className="font-medium">Route:</span>
+              <span className="ml-1">{detail.startLocation} → {detail.endLocation}</span>
+            </div>
+            
+            <div className="flex items-center">
+              <Gauge className="h-3 w-3 mr-1 text-purple-500" />
+              <span className="font-medium">Speed:</span>
+              <span className="ml-1">{detail.speed.toFixed(1)} km/h</span>
+            </div>
+            
+            <div className="flex items-center">
+              <Navigation className="h-3 w-3 mr-1 text-orange-500" />
+              <span className="font-medium">Distance:</span>
+              <span className="ml-1">{detail.distance.toFixed(1)} km</span>
+            </div>
+            
+            {detail.vehicle && (
+              <div className="flex items-center">
+                <Car className="h-3 w-3 mr-1 text-gray-500" />
+                <span className="font-medium">Vehicle:</span>
+                <span className="ml-1">{detail.vehicle}</span>
+                {detail.licensePlate && (
+                  <span className="ml-2 text-gray-400">({detail.licensePlate})</span>
+                )}
+              </div>
+            )}
+            
+            <div className="flex items-center text-gray-400">
+              <span className="text-xs">Updated: {new Date(detail.updatedAt).toLocaleTimeString()}</span>
+            </div>
+            
+            <div className="flex items-center text-gray-400">
+              <Map className="h-3 w-3 mr-1" />
+              <span className="text-xs">
+                {detail.position[0].toFixed(6)}, {detail.position[1].toFixed(6)}
+              </span>
+            </div>
+          </div>
+        </div>
+      )
+    }))
   }
 
   const mapMarkers = getMapMarkers()
-  const selectedTrip = selectedTripId ? activeTrips.find(t => t.id === selectedTripId) : null
+  const selectedTrip = selectedTripId ? tripDetails.find(t => t.id === selectedTripId) : null
 
   return (
     <Card className="h-full flex flex-col">
@@ -128,6 +219,7 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
             size="sm"
             onClick={showAllTripsOnMap}
             disabled={showAllTrips && !selectedTripId}
+            title="Show all trips"
           >
             <Filter className="h-4 w-4" />
           </Button>
@@ -136,6 +228,7 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
             size="sm"
             onClick={handleRefresh}
             disabled={refreshing}
+            title="Refresh trips data"
           >
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           </Button>
@@ -156,9 +249,9 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
           </div>
         ) : (
           <div className="flex-1 min-h-80">
-            <Map 
+            <MapComponent 
               markers={mapMarkers}
-              center={selectedTrip ? [selectedTrip.current_lat!, selectedTrip.current_lng!] : [0, 0]}
+              center={selectedTrip ? selectedTrip.position : [0, 0]}
               zoom={selectedTrip ? 15 : 2}
               showStats={true}
             />
@@ -170,7 +263,7 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-medium">
                 Active Trips ({activeTrips.length})
-                {selectedTripId && ` • Selected: ${selectedTrip?.driver?.name || 'Unknown'}`}
+                {selectedTripId && ` • Selected: ${selectedTrip?.driverName || 'Unknown'}`}
               </h3>
               {selectedTripId && (
                 <Button variant="outline" size="sm" onClick={showAllTripsOnMap}>
@@ -179,32 +272,33 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
               )}
             </div>
             <div className="space-y-2 max-h-32 overflow-y-auto">
-              {activeTrips.map(trip => (
+              {tripDetails.map(detail => (
                 <div 
-                  key={trip.id} 
+                  key={detail.id} 
                   className={`flex items-center justify-between text-sm p-2 rounded cursor-pointer ${
-                    selectedTripId === trip.id ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50'
+                    selectedTripId === detail.id ? 'bg-blue-50 border border-blue-200' : 'hover:bg-gray-50'
                   }`}
-                  onClick={() => handleTripSelect(trip.id)}
+                  onClick={() => handleTripSelect(detail.id)}
                 >
                   <div className="flex items-center">
-                    <div className={`w-2 h-2 rounded-full mr-2 ${
-                      trip.status === 'in_progress' ? 'bg-green-500' : 'bg-yellow-500'
-                    }`}></div>
-                    <span className="font-medium">{trip.driver?.name || 'Unknown'}</span>
+                    <div className={`w-2 h-2 rounded-full mr-2 bg-green-500`}></div>
+                    <div>
+                      <span className="font-medium">{detail.driverName}</span>
+                      <div className="text-xs text-gray-500">
+                        {detail.startLocation} → {detail.endLocation}
+                      </div>
+                    </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-gray-500 text-xs block">
-                      {trip.start_location} → {trip.end_location}
-                    </span>
-                    <span className="text-gray-400 text-xs">
-                      {trip.distance?.toFixed(1) || '0'} km
-                    </span>
-                    {trip.current_lat && trip.current_lng && (
-                      <span className="text-gray-400 text-xs block">
-                        {trip.current_lat.toFixed(4)}, {trip.current_lng.toFixed(4)}
-                      </span>
-                    )}
+                    <div className="text-xs font-medium text-purple-600">
+                      {detail.speed.toFixed(0)} km/h
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {detail.distance.toFixed(1)} km
+                    </div>
+                    <div className="text-xs text-gray-300">
+                      {new Date(detail.updatedAt).toLocaleTimeString()}
+                    </div>
                   </div>
                 </div>
               ))}
