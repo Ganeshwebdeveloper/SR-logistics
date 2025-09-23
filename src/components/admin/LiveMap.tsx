@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { MapPin, Navigation, RefreshCw, Filter, Car, Gauge, Map } from 'lucide-react'
@@ -137,8 +137,8 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
     setShowAllTrips(true)
   }
 
-  // Prepare map markers based on selection
-  const getMapMarkers = () => {
+  // Prepare map markers based on selection, memoized to prevent re-renders
+  const mapMarkers = useMemo(() => {
     let detailsToShow = tripDetails
     
     if (selectedTripId) {
@@ -207,9 +207,8 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
         </div>
       )
     }))
-  }
+  }, [tripDetails, selectedTripId, showAllTrips])
 
-  const mapMarkers = getMapMarkers()
   const selectedTrip = selectedTripId ? tripDetails.find(t => t.id === selectedTripId) : null
 
   return (
