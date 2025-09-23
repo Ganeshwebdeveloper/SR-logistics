@@ -3,7 +3,7 @@
 import React from 'react'
 import dynamic from 'next/dynamic'
 
-const Map = dynamic(() => import('@/components/Map'), { 
+const LeafletMap = dynamic(() => import('@/components/LeafletMap'), { 
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-64">
@@ -30,7 +30,7 @@ export default function TestMapPage() {
     <div className="min-h-screen p-4">
       <h1 className="text-2xl font-bold mb-4">Test Map</h1>
       <div className="h-96 w-full border rounded-lg">
-        <Map 
+        <LeafletMap 
           markers={testMarkers}
           center={[51.505, -0.09]}
           zoom={13}

@@ -10,7 +10,7 @@ import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
 
 // Dynamically import the Map component to avoid SSR issues
-const MapComponent = dynamic(() => import('@/components/Map'), { 
+const MapComponent = dynamic(() => import('@/components/LeafletMap'), { 
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-64">

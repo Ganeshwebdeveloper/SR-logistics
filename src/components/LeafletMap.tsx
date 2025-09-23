@@ -76,7 +76,7 @@ const createTruckIcon = (driverName: string = 'Driver') => {
   })
 }
 
-export default function Map(props: MapProps) {
+export default function LeafletMap(props: MapProps) {
   const { 
     markers = [], 
     center = [0, 0], 
