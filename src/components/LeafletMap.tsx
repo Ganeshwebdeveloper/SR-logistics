@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -88,16 +88,40 @@ export default function LeafletMap(props: MapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
   const markersRef = useRef<Map<string, L.Marker>>(new Map())
-  const [mapStats, setMapStats] = useState<{
-    totalDistance: number
-    averageSpeed: number
-    markersCount: number
-  }>({
-    totalDistance: 0,
-    averageSpeed: 0,
-    markersCount: 0
-  })
   const [isMapInitialized, setIsMapInitialized] = useState(false)
+
+  const mapStats = useMemo(() => {
+    let totalDistance = 0
+    let totalTime = 0
+    let previousPosition: [number, number] | null = null
+    let previousTime: number | null = null
+
+    markers.forEach((marker, index) => {
+      if (index > 0 && previousPosition) {
+        const [prevLat, prevLng] = previousPosition
+        const [currLat, currLng] = marker.position
+        const distance = calculateDistance(prevLat, prevLng, currLat, currLng)
+        totalDistance += distance
+
+        if (previousTime) {
+          const timeDiff = (Date.now() - previousTime) / 1000 / 3600 // hours
+          if (timeDiff > 0) {
+            totalTime += timeDiff
+          }
+        }
+      }
+      previousPosition = marker.position
+      previousTime = Date.now()
+    })
+
+    const averageSpeed = totalTime > 0 ? totalDistance / totalTime : 0
+
+    return {
+      totalDistance: parseFloat(totalDistance.toFixed(2)),
+      averageSpeed: parseFloat(averageSpeed.toFixed(2)),
+      markersCount: markers.length
+    }
+  }, [markers])
 
   // Initialize map only once
   useEffect(() => {
@@ -164,37 +188,6 @@ export default function LeafletMap(props: MapProps) {
     if (!mapInstanceRef.current || !isMapInitialized) return
 
     try {
-      let totalDistance = 0
-      let totalTime = 0
-      let previousPosition: [number, number] | null = null
-      let previousTime: number | null = null
-
-      markers.forEach((marker, index) => {
-        if (index > 0 && previousPosition) {
-          const [prevLat, prevLng] = previousPosition
-          const [currLat, currLng] = marker.position
-          const distance = calculateDistance(prevLat, prevLng, currLat, currLng)
-          totalDistance += distance
-
-          if (previousTime) {
-            const timeDiff = (Date.now() - previousTime) / 1000 / 3600 // hours
-            if (timeDiff > 0) {
-              totalTime += timeDiff
-            }
-          }
-        }
-        previousPosition = marker.position
-        previousTime = Date.now()
-      })
-
-      const averageSpeed = totalTime > 0 ? totalDistance / totalTime : 0
-
-      setMapStats({
-        totalDistance: parseFloat(totalDistance.toFixed(2)),
-        averageSpeed: parseFloat(averageSpeed.toFixed(2)),
-        markersCount: markers.length
-      })
-
       const currentMarkerIds = new Set(markers.map(m => m.id))
 
       markersRef.current.forEach((marker, markerId) => {
