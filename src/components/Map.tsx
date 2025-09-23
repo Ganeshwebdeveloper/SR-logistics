@@ -57,8 +57,20 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
   useEffect(() => {
     if (!mapRef.current) return
 
+    // Clean up any existing map instance
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove()
+      mapInstanceRef.current = null
+    }
+
     // Initialize map
-    const map = L.map(mapRef.current).setView(center, zoom)
+    const map = L.map(mapRef.current, {
+      center: center,
+      zoom: zoom,
+      zoomControl: true,
+      attributionControl: true
+    })
+    
     mapInstanceRef.current = map
 
     // Add tile layer with proper attribution
@@ -71,89 +83,128 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
     // Add scale control
     L.control.scale({ imperial: false, metric: true }).addTo(map)
 
+    // Cleanup function
     return () => {
-      map.remove()
+      if (mapInstanceRef.current) {
+        try {
+          // Remove all markers first
+          markersRef.current.forEach(marker => {
+            if (mapInstanceRef.current) {
+              marker.remove()
+            }
+          })
+          markersRef.current = []
+          
+          // Then remove the map
+          mapInstanceRef.current.remove()
+        } catch (error) {
+          console.warn('Error cleaning up map:', error)
+        }
+        mapInstanceRef.current = null
+      }
     }
   }, [center, zoom])
 
   useEffect(() => {
     if (!mapInstanceRef.current) return
 
-    // Calculate distance and speed statistics
-    let totalDistance = 0
-    let totalTime = 0
-    let previousPosition: [number, number] | null = null
-    let previousTime: number | null = null
+    try {
+      // Calculate distance and speed statistics
+      let totalDistance = 0
+      let totalTime = 0
+      let previousPosition: [number, number] | null = null
+      let previousTime: number | null = null
 
-    markers.forEach((marker, index) => {
-      if (index > 0 && previousPosition) {
-        const [prevLat, prevLng] = previousPosition
-        const [currLat, currLng] = marker.position
-        const distance = calculateDistance(prevLat, prevLng, currLat, currLng)
-        totalDistance += distance
+      markers.forEach((marker, index) => {
+        if (index > 0 && previousPosition) {
+          const [prevLat, prevLng] = previousPosition
+          const [currLat, currLng] = marker.position
+          const distance = calculateDistance(prevLat, prevLng, currLat, currLng)
+          totalDistance += distance
 
-        if (previousTime) {
-          const timeDiff = (Date.now() - previousTime) / 1000 / 3600 // hours
-          if (timeDiff > 0) {
-            totalTime += timeDiff
+          if (previousTime) {
+            const timeDiff = (Date.now() - previousTime) / 1000 / 3600 // hours
+            if (timeDiff > 0) {
+              totalTime += timeDiff
+            }
           }
         }
-      }
-      previousPosition = marker.position
-      previousTime = Date.now()
-    })
-
-    const averageSpeed = totalTime > 0 ? totalDistance / totalTime : 0
-
-    setMapStats({
-      totalDistance: parseFloat(totalDistance.toFixed(2)),
-      averageSpeed: parseFloat(averageSpeed.toFixed(2)),
-      markersCount: markers.length
-    })
-
-    // Clear existing markers
-    markersRef.current.forEach(marker => {
-      marker.remove()
-    })
-    markersRef.current = []
-
-    // Add new markers with custom icons
-    markers.forEach(markerData => {
-      const customIcon = L.icon({
-        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-        iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowSize: [41, 41]
+        previousPosition = marker.position
+        previousTime = Date.now()
       })
 
-      const marker = L.marker(markerData.position, { icon: customIcon }).addTo(mapInstanceRef.current!)
-      
-      if (markerData.popupContent) {
-        marker.bindPopup(() => {
-          const div = document.createElement('div')
-          div.innerHTML = `
-            <div class="p-2">
-              <h3 class="font-bold">${markerData.driverName || 'Driver'}</h3>
-              <p class="text-sm">Location: ${markerData.position[0].toFixed(6)}, ${markerData.position[1].toFixed(6)}</p>
-            </div>
-          `
-          return div
-        })
-      }
-      
-      markersRef.current.push(marker)
-    })
+      const averageSpeed = totalTime > 0 ? totalDistance / totalTime : 0
 
-    // Fit map to show all markers if there are any
-    if (markers.length > 0) {
-      const bounds = L.latLngBounds(markers.map(m => m.position))
-      mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] })
-    } else {
-      // Set default view if no markers
-      mapInstanceRef.current.setView(center, zoom)
+      setMapStats({
+        totalDistance: parseFloat(totalDistance.toFixed(2)),
+        averageSpeed: parseFloat(averageSpeed.toFixed(2)),
+        markersCount: markers.length
+      })
+
+      // Clear existing markers
+      markersRef.current.forEach(marker => {
+        if (mapInstanceRef.current) {
+          try {
+            marker.remove()
+          } catch (error) {
+            console.warn('Error removing marker:', error)
+          }
+        }
+      })
+      markersRef.current = []
+
+      // Add new markers with custom icons
+      markers.forEach(markerData => {
+        if (!mapInstanceRef.current) return
+        
+        const customIcon = L.icon({
+          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34],
+          shadowSize: [41, 41]
+        })
+
+        try {
+          const marker = L.marker(markerData.position, { icon: customIcon }).addTo(mapInstanceRef.current!)
+          
+          if (markerData.popupContent) {
+            marker.bindPopup(() => {
+              const div = document.createElement('div')
+              div.innerHTML = `
+                <div class="p-2">
+                  <h3 class="font-bold">${markerData.driverName || 'Driver'}</h3>
+                  <p class="text-sm">Location: ${markerData.position[0].toFixed(6)}, ${markerData.position[1].toFixed(6)}</p>
+                </div>
+              `
+              return div
+            })
+          }
+          
+          markersRef.current.push(marker)
+        } catch (error) {
+          console.warn('Error adding marker:', error)
+        }
+      })
+
+      // Fit map to show all markers if there are any
+      if (markers.length > 0) {
+        try {
+          const bounds = L.latLngBounds(markers.map(m => m.position))
+          mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] })
+        } catch (error) {
+          console.warn('Error fitting bounds:', error)
+          // Set default view if bounds fitting fails
+          mapInstanceRef.current.setView(center, zoom)
+        }
+      } else {
+        // Set default view if no markers
+        mapInstanceRef.current.setView(center, zoom)
+      }
+    } catch (error) {
+      console.error('Error updating map markers:', error)
     }
   }, [markers, center, zoom])
 
