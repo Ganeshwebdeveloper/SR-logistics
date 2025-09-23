@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -92,7 +92,6 @@ export default function LeafletMap(props: MapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
   const markersRef = useRef<Map<string, L.Marker>>(new Map())
-  const [isMapInitialized, setIsMapInitialized] = useState(false)
 
   const mapStats = useMemo(() => {
     let totalDistance = 0
@@ -127,20 +126,9 @@ export default function LeafletMap(props: MapProps) {
     }
   }, [markers])
 
-  // Initialize map only once
+  // Initialize map
   useEffect(() => {
-    if (!mapRef.current || isMapInitialized) return
-
-    if (mapInstanceRef.current) {
-      try {
-        mapInstanceRef.current.remove()
-      } catch (error) {
-        console.warn('Error removing existing map:', error)
-      }
-      mapInstanceRef.current = null
-    }
-
-    try {
+    if (mapRef.current && !mapInstanceRef.current) {
       const map = L.map(mapRef.current, {
         center: center,
         zoom: zoom,
@@ -149,7 +137,6 @@ export default function LeafletMap(props: MapProps) {
       })
       
       mapInstanceRef.current = map
-      setIsMapInitialized(true)
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -158,137 +145,79 @@ export default function LeafletMap(props: MapProps) {
       }).addTo(map)
 
       L.control.scale({ imperial: false, metric: true }).addTo(map)
-
-    } catch (error) {
-      console.error('Error initializing map:', error)
     }
 
+    // Cleanup on unmount
     return () => {
       if (mapInstanceRef.current) {
-        try {
-          markersRef.current.forEach(marker => {
-            try {
-              if (mapInstanceRef.current && marker) {
-                marker.remove()
-              }
-            } catch (error) {
-              console.warn('Error removing marker during cleanup:', error)
-            }
-          })
-          markersRef.current.clear()
-          
-          mapInstanceRef.current.remove()
-        } catch (error) {
-          console.warn('Error cleaning up map:', error)
-        }
+        mapInstanceRef.current.remove()
         mapInstanceRef.current = null
-        setIsMapInitialized(false)
       }
     }
-  }, [center, zoom, isMapInitialized])
+  }, [])
 
-  // Update markers when markers array changes
+  // Update markers and view
   useEffect(() => {
-    if (!mapInstanceRef.current || !isMapInitialized) return
+    const map = mapInstanceRef.current
+    if (!map) return
 
-    try {
-      const currentMarkerIds = new Set(markers.map(m => m.id))
+    // Update markers
+    const currentMarkerIds = new Set(markers.map(m => m.id))
+    markersRef.current.forEach((marker, markerId) => {
+      if (!currentMarkerIds.has(markerId)) {
+        marker.remove()
+        markersRef.current.delete(markerId)
+      }
+    })
 
-      markersRef.current.forEach((marker, markerId) => {
-        if (!currentMarkerIds.has(markerId)) {
-          try {
-            if (mapInstanceRef.current && marker) {
-              marker.remove()
-            }
-            markersRef.current.delete(markerId)
-          } catch (error) {
-            console.warn('Error removing old marker:', error)
-            markersRef.current.delete(markerId)
-          }
-        }
-      })
-
-      markers.forEach(markerData => {
-        if (!mapInstanceRef.current) return
+    markers.forEach(markerData => {
+      const existingMarker = markersRef.current.get(markerData.id)
+      if (existingMarker) {
+        existingMarker.setLatLng(markerData.position)
+      } else {
+        const truckIcon = createTruckIcon(markerData.driverName)
+        const newMarker = L.marker(markerData.position, { icon: truckIcon }).addTo(map)
         
-        const existingMarker = markersRef.current.get(markerData.id)
-        
-        if (existingMarker) {
-          try {
-            existingMarker.setLatLng(markerData.position)
-          } catch (error) {
-            console.warn('Error updating marker position:', error)
-            try {
-              existingMarker.remove()
-              markersRef.current.delete(markerData.id)
-            } catch (removeError) {
-              console.warn('Error removing problematic marker:', removeError)
-              markersRef.current.delete(markerData.id)
-            }
-          }
-        } else {
-          try {
-            const truckIcon = createTruckIcon(markerData.driverName)
-            const marker = L.marker(markerData.position, { icon: truckIcon }).addTo(mapInstanceRef.current)
-            
-            marker.bindPopup(() => {
-              const div = document.createElement('div')
-              const speed = markerData.speed?.toFixed(1) || '0.0'
-              const distance = markerData.distance?.toFixed(1) || '0.0'
-              const updatedAt = markerData.updatedAt ? new Date(markerData.updatedAt).toLocaleTimeString() : 'N/A'
+        newMarker.bindPopup(() => {
+            const div = document.createElement('div')
+            const speed = markerData.speed?.toFixed(1) || '0.0'
+            const distance = markerData.distance?.toFixed(1) || '0.0'
+            const updatedAt = markerData.updatedAt ? new Date(markerData.updatedAt).toLocaleTimeString() : 'N/A'
 
-              div.innerHTML = `
-                <div class="p-3 min-w-[250px]">
-                  <div class="flex items-center justify-between mb-2">
-                    <h3 class="font-bold text-sm">${markerData.driverName || 'Driver'}</h3>
-                    <div class="flex items-center text-xs text-green-600">
-                      <div class="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-                      Active
-                    </div>
-                  </div>
-                  <div class="space-y-1 text-xs">
-                    <div><span class="font-medium">Route:</span> ${markerData.startLocation} → ${markerData.endLocation}</div>
-                    <div><span class="font-medium">Speed:</span> ${speed} km/h</div>
-                    <div><span class="font-medium">Distance:</span> ${distance} km</div>
-                    ${markerData.vehicle ? `<div><span class="font-medium">Vehicle:</span> ${markerData.vehicle} ${markerData.licensePlate ? `(${markerData.licensePlate})` : ''}</div>` : ''}
-                    <div class="text-gray-400">Updated: ${updatedAt}</div>
-                    <div class="text-gray-400">Location: ${markerData.position[0].toFixed(6)}, ${markerData.position[1].toFixed(6)}</div>
+            div.innerHTML = `
+              <div class="p-3 min-w-[250px]">
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="font-bold text-sm">${markerData.driverName || 'Driver'}</h3>
+                  <div class="flex items-center text-xs text-green-600">
+                    <div class="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                    Active
                   </div>
                 </div>
-              `
-              return div
-            })
-            
-            markersRef.current.set(markerData.id, marker)
-          } catch (error) {
-            console.warn('Error adding new marker:', error)
-          }
-        }
-      })
+                <div class="space-y-1 text-xs">
+                  <div><span class="font-medium">Route:</span> ${markerData.startLocation} → ${markerData.endLocation}</div>
+                  <div><span class="font-medium">Speed:</span> ${speed} km/h</div>
+                  <div><span class="font-medium">Distance:</span> ${distance} km</div>
+                  ${markerData.vehicle ? `<div><span class="font-medium">Vehicle:</span> ${markerData.vehicle} ${markerData.licensePlate ? `(${markerData.licensePlate})` : ''}</div>` : ''}
+                  <div class="text-gray-400">Updated: ${updatedAt}</div>
+                  <div class="text-gray-400">Location: ${markerData.position[0].toFixed(6)}, ${markerData.position[1].toFixed(6)}</div>
+                </div>
+              </div>
+            `
+            return div
+        })
 
-      if (markers.length > 0) {
-        try {
-          const bounds = L.latLngBounds(markers.map(m => m.position))
-          mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] })
-        } catch (error) {
-          console.warn('Error fitting bounds:', error)
-          try {
-            mapInstanceRef.current.setView(center, zoom)
-          } catch (viewError) {
-            console.warn('Error setting map view:', viewError)
-          }
-        }
-      } else {
-        try {
-          mapInstanceRef.current.setView(center, zoom)
-        } catch (error) {
-          console.warn('Error setting default view:', error)
-        }
+        markersRef.current.set(markerData.id, newMarker)
       }
-    } catch (error) {
-      console.error('Error updating map markers:', error)
+    })
+
+    // Update view
+    if (markers.length > 0) {
+      const bounds = L.latLngBounds(markers.map(m => m.position))
+      map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 })
+    } else {
+      map.setView(center, zoom)
     }
-  }, [markers, center, zoom, isMapInitialized])
+  }, [markers, center, zoom])
 
   return (
     <div className="flex flex-col h-full">
