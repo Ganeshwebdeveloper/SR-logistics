@@ -15,10 +15,14 @@ L.Icon.Default.mergeOptions({
 interface MapMarker {
   id: string
   position: [number, number]
-  popupContent: React.ReactNode
   driverName?: string
   vehicle?: string
   licensePlate?: string
+  startLocation?: string
+  endLocation?: string
+  speed?: number
+  distance?: number
+  updatedAt?: string
 }
 
 interface MapProps {
@@ -227,47 +231,33 @@ export default function LeafletMap(props: MapProps) {
             const truckIcon = createTruckIcon(markerData.driverName)
             const marker = L.marker(markerData.position, { icon: truckIcon }).addTo(mapInstanceRef.current)
             
-            if (markerData.popupContent) {
-              marker.bindPopup(() => {
-                const div = document.createElement('div')
-                div.innerHTML = `
-                  <div class="p-3 min-w-[250px]">
-                    <div class="flex items-center justify-between mb-2">
-                      <h3 class="font-bold text-sm">${markerData.driverName || 'Driver'}</h3>
-                      <div class="flex items-center text-xs text-green-600">
-                        <div class="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-                        Active
-                      </div>
-                    </div>
-                    
-                    <div class="space-y-2 text-xs">
-                      <div class="flex items-center">
-                        <svg class="h-3 w-3 mr-1 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                          <circle cx="12" cy="10" r="3" />
-                        </svg>
-                        <span class="font-medium">Location:</span>
-                        <span class="ml-1">${markerData.position[0].toFixed(6)}, ${markerData.position[1].toFixed(6)}</span>
-                      </div>
-                      
-                      ${markerData.vehicle ? `
-                      <div class="flex items-center">
-                        <svg class="h-3 w-3 mr-1 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                          <path d="M10 17h4V5H9v12h1zm7 0h3v-3.5M14 5h6l3 3v9h-3" />
-                          <circle cx="7" cy="17" r="2" />
-                          <circle cx="17" cy="17" r="2" />
-                        </svg>
-                        <span class="font-medium">Vehicle:</span>
-                        <span class="ml-1">${markerData.vehicle}</span>
-                        ${markerData.licensePlate ? `<span class="ml-2 text-gray-400">(${markerData.licensePlate})</span>` : ''}
-                      </div>
-                      ` : ''}
+            marker.bindPopup(() => {
+              const div = document.createElement('div')
+              const speed = markerData.speed?.toFixed(1) || '0.0'
+              const distance = markerData.distance?.toFixed(1) || '0.0'
+              const updatedAt = markerData.updatedAt ? new Date(markerData.updatedAt).toLocaleTimeString() : 'N/A'
+
+              div.innerHTML = `
+                <div class="p-3 min-w-[250px]">
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-bold text-sm">${markerData.driverName || 'Driver'}</h3>
+                    <div class="flex items-center text-xs text-green-600">
+                      <div class="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                      Active
                     </div>
                   </div>
-                `
-                return div
-              })
-            }
+                  <div class="space-y-1 text-xs">
+                    <div><span class="font-medium">Route:</span> ${markerData.startLocation} → ${markerData.endLocation}</div>
+                    <div><span class="font-medium">Speed:</span> ${speed} km/h</div>
+                    <div><span class="font-medium">Distance:</span> ${distance} km</div>
+                    ${markerData.vehicle ? `<div><span class="font-medium">Vehicle:</span> ${markerData.vehicle} ${markerData.licensePlate ? `(${markerData.licensePlate})` : ''}</div>` : ''}
+                    <div class="text-gray-400">Updated: ${updatedAt}</div>
+                    <div class="text-gray-400">Location: ${markerData.position[0].toFixed(6)}, ${markerData.position[1].toFixed(6)}</div>
+                  </div>
+                </div>
+              `
+              return div
+            })
             
             markersRef.current.set(markerData.id, marker)
           } catch (error) {

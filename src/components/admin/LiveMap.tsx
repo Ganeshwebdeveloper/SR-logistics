@@ -153,59 +153,11 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
       driverName: detail.driverName,
       vehicle: detail.vehicle,
       licensePlate: detail.licensePlate,
-      popupContent: (
-        <div className="p-3 min-w-[250px]">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-bold text-sm">{detail.driverName}</h3>
-            <div className="flex items-center text-xs text-green-600">
-              <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-              Active
-            </div>
-          </div>
-          
-          <div className="space-y-2 text-xs">
-            <div className="flex items-center">
-              <MapPin className="h-3 w-3 mr-1 text-blue-500" />
-              <span className="font-medium">Route:</span>
-              <span className="ml-1">{detail.startLocation} → {detail.endLocation}</span>
-            </div>
-            
-            <div className="flex items-center">
-              <Gauge className="h-3 w-3 mr-1 text-purple-500" />
-              <span className="font-medium">Speed:</span>
-              <span className="ml-1">{detail.speed.toFixed(1)} km/h</span>
-            </div>
-            
-            <div className="flex items-center">
-              <Navigation className="h-3 w-3 mr-1 text-orange-500" />
-              <span className="font-medium">Distance:</span>
-              <span className="ml-1">{detail.distance.toFixed(1)} km</span>
-            </div>
-            
-            {detail.vehicle && (
-              <div className="flex items-center">
-                <Car className="h-3 w-3 mr-1 text-gray-500" />
-                <span className="font-medium">Vehicle:</span>
-                <span className="ml-1">{detail.vehicle}</span>
-                {detail.licensePlate && (
-                  <span className="ml-2 text-gray-400">({detail.licensePlate})</span>
-                )}
-              </div>
-            )}
-            
-            <div className="flex items-center text-gray-400">
-              <span className="text-xs">Updated: {new Date(detail.updatedAt).toLocaleTimeString()}</span>
-            </div>
-            
-            <div className="flex items-center text-gray-400">
-              <Map className="h-3 w-3 mr-1" />
-              <span className="text-xs">
-                {detail.position[0].toFixed(6)}, {detail.position[1].toFixed(6)}
-              </span>
-            </div>
-          </div>
-        </div>
-      )
+      startLocation: detail.startLocation,
+      endLocation: detail.endLocation,
+      speed: detail.speed,
+      distance: detail.distance,
+      updatedAt: detail.updatedAt
     }))
   }, [tripDetails, selectedTripId, showAllTrips])
 

@@ -17,12 +17,14 @@ export default function TestMapPage() {
     {
       id: '1',
       position: [51.505, -0.09] as [number, number],
-      popupContent: (
-        <div className="p-2">
-          <h3 className="font-bold">Test Marker</h3>
-          <p className="text-sm">This is a test marker</p>
-        </div>
-      )
+      driverName: 'Test Driver',
+      vehicle: 'Test Car',
+      licensePlate: 'TEST-123',
+      startLocation: 'London',
+      endLocation: 'Paris',
+      speed: 50,
+      distance: 10,
+      updatedAt: new Date().toISOString()
     }
   ]
 
