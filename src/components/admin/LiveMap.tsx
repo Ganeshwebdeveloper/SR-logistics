@@ -150,6 +150,9 @@ export function LiveMap({ trips, onRefresh }: LiveMapProps) {
     return detailsToShow.map(detail => ({
       id: detail.id,
       position: detail.position,
+      driverName: detail.driverName,
+      vehicle: detail.vehicle,
+      licensePlate: detail.licensePlate,
       popupContent: (
         <div className="p-3 min-w-[250px]">
           <div className="flex items-center justify-between mb-2">

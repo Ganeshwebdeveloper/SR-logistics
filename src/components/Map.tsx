@@ -17,6 +17,8 @@ interface MapMarker {
   position: [number, number]
   popupContent: React.ReactNode
   driverName?: string
+  vehicle?: string
+  licensePlate?: string
 }
 
 interface MapProps {
@@ -38,6 +40,40 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
     Math.sin(dLon/2) * Math.sin(dLon/2)
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
   return R * c
+}
+
+// Create custom truck icon
+const createTruckIcon = (driverName: string = 'Driver') => {
+  return L.divIcon({
+    className: 'custom-truck-marker',
+    html: `
+      <div style="
+        background: #2563eb;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 10px;
+        font-weight: bold;
+        white-space: nowrap;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        border: 2px solid white;
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      ">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10 17h4V5H9v12h1zm7 0h3v-3.5M14 5h6l3 3v9h-3" />
+          <circle cx="7" cy="17" r="2" />
+          <circle cx="17" cy="17" r="2" />
+        </svg>
+        ${driverName}
+      </div>
+    `,
+    iconSize: [120, 32],
+    iconAnchor: [60, 16],
+    popupAnchor: [0, -16]
+  })
 }
 
 export default function Map({ markers = [], center = [0, 0], zoom = 2, className = '', showStats = true }: MapProps) {
@@ -153,30 +189,51 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
       })
       markersRef.current = []
 
-      // Add new markers with custom icons
+      // Add new markers with custom truck icons
       markers.forEach(markerData => {
         if (!mapInstanceRef.current) return
         
-        const customIcon = L.icon({
-          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-          iconSize: [25, 41],
-          iconAnchor: [12, 41],
-          popupAnchor: [1, -34],
-          shadowSize: [41, 41]
-        })
+        const truckIcon = createTruckIcon(markerData.driverName)
 
         try {
-          const marker = L.marker(markerData.position, { icon: customIcon }).addTo(mapInstanceRef.current!)
+          const marker = L.marker(markerData.position, { icon: truckIcon }).addTo(mapInstanceRef.current!)
           
           if (markerData.popupContent) {
             marker.bindPopup(() => {
               const div = document.createElement('div')
               div.innerHTML = `
-                <div class="p-2">
-                  <h3 class="font-bold">${markerData.driverName || 'Driver'}</h3>
-                  <p class="text-sm">Location: ${markerData.position[0].toFixed(6)}, ${markerData.position[1].toFixed(6)}</p>
+                <div class="p-3 min-w-[250px]">
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-bold text-sm">${markerData.driverName || 'Driver'}</h3>
+                    <div class="flex items-center text-xs text-green-600">
+                      <div class="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                      Active
+                    </div>
+                  </div>
+                  
+                  <div class="space-y-2 text-xs">
+                    <div class="flex items-center">
+                      <svg class="h-3 w-3 mr-1 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                      <span class="font-medium">Location:</span>
+                      <span class="ml-1">${markerData.position[0].toFixed(6)}, ${markerData.position[1].toFixed(6)}</span>
+                    </div>
+                    
+                    ${markerData.vehicle ? `
+                    <div class="flex items-center">
+                      <svg class="h-3 w-3 mr-1 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M10 17h4V5H9v12h1zm7 0h3v-3.5M14 5h6l3 3v9h-3" />
+                        <circle cx="7" cy="17" r="2" />
+                        <circle cx="17" cy="17" r="2" />
+                      </svg>
+                      <span class="font-medium">Vehicle:</span>
+                      <span class="ml-1">${markerData.vehicle}</span>
+                      ${markerData.licensePlate ? `<span class="ml-2 text-gray-400">(${markerData.licensePlate})</span>` : ''}
+                    </div>
+                    ` : ''}
+                  </div>
                 </div>
               `
               return div
@@ -220,19 +277,19 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
         <div className="bg-gray-50 p-3 border-t">
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div className="text-center">
-              <div className="font-semibold text-gray-700">Distance</div>
+              <div className="font-semibold text-gray-700">Total Distance</div>
               <div className="text-lg font-bold text-blue-600">
                 {mapStats.totalDistance} km
               </div>
             </div>
             <div className="text-center">
-              <div className="font-semibold text-gray-700">Speed</div>
+              <div className="font-semibold text-gray-700">Avg Speed</div>
               <div className="text-lg font-bold text-green-600">
                 {mapStats.averageSpeed} km/h
               </div>
             </div>
             <div className="text-center">
-              <div className="font-semibold text-gray-700">Markers</div>
+              <div className="font-semibold text-gray-700">Active Trucks</div>
               <div className="text-lg font-bold text-purple-600">
                 {mapStats.markersCount}
               </div>
