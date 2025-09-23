@@ -3,7 +3,7 @@
 import React from 'react'
 import dynamic from 'next/dynamic'
 
-const LeafletMap = dynamic(() => import('@/components/LeafletMap'), { 
+const Map = dynamic(() => import('@/components/Map'), { 
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-64">
@@ -17,14 +17,12 @@ export default function TestMapPage() {
     {
       id: '1',
       position: [51.505, -0.09] as [number, number],
-      driverName: 'Test Driver',
-      vehicle: 'Test Car',
-      licensePlate: 'TEST-123',
-      startLocation: 'London',
-      endLocation: 'Paris',
-      speed: 50,
-      distance: 10,
-      updatedAt: new Date().toISOString()
+      popupContent: (
+        <div className="p-2">
+          <h3 className="font-bold">Test Marker</h3>
+          <p className="text-sm">This is a test marker</p>
+        </div>
+      )
     }
   ]
 
@@ -32,7 +30,7 @@ export default function TestMapPage() {
     <div className="min-h-screen p-4">
       <h1 className="text-2xl font-bold mb-4">Test Map</h1>
       <div className="h-96 w-full border rounded-lg">
-        <LeafletMap 
+        <Map 
           markers={testMarkers}
           center={[51.505, -0.09]}
           zoom={13}
