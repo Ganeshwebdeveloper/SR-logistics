@@ -76,13 +76,15 @@ const createTruckIcon = (driverName: string = 'Driver') => {
   })
 }
 
-export default function Map({ 
-  markers = [], 
-  center = [0, 0], 
-  zoom = 2, 
-  className = '', 
-  showStats = true 
-}: MapProps) {
+export default function Map(props: MapProps) {
+  const { 
+    markers = [], 
+    center = [0, 0], 
+    zoom = 2, 
+    className = '', 
+    showStats = true 
+  } = props || {};
+
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
   const markersRef = useRef<Map<string, L.Marker>>(new Map())
@@ -101,7 +103,6 @@ export default function Map({
   useEffect(() => {
     if (!mapRef.current || isMapInitialized) return
 
-    // Clean up any existing map instance
     if (mapInstanceRef.current) {
       try {
         mapInstanceRef.current.remove()
@@ -111,7 +112,6 @@ export default function Map({
       mapInstanceRef.current = null
     }
 
-    // Initialize map
     try {
       const map = L.map(mapRef.current, {
         center: center,
@@ -123,25 +123,21 @@ export default function Map({
       mapInstanceRef.current = map
       setIsMapInitialized(true)
 
-      // Add tile layer with proper attribution
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19,
         detectRetina: true
       }).addTo(map)
 
-      // Add scale control
       L.control.scale({ imperial: false, metric: true }).addTo(map)
 
     } catch (error) {
       console.error('Error initializing map:', error)
     }
 
-    // Cleanup function
     return () => {
       if (mapInstanceRef.current) {
         try {
-          // Remove all markers first
           markersRef.current.forEach(marker => {
             try {
               if (mapInstanceRef.current && marker) {
@@ -153,7 +149,6 @@ export default function Map({
           })
           markersRef.current.clear()
           
-          // Then remove the map
           mapInstanceRef.current.remove()
         } catch (error) {
           console.warn('Error cleaning up map:', error)
@@ -168,17 +163,13 @@ export default function Map({
   useEffect(() => {
     if (!mapInstanceRef.current || !isMapInitialized) return
 
-    // Ensure markers is an array
-    const safeMarkers = Array.isArray(markers) ? markers : []
-
     try {
-      // Calculate distance and speed statistics
       let totalDistance = 0
       let totalTime = 0
       let previousPosition: [number, number] | null = null
       let previousTime: number | null = null
 
-      safeMarkers.forEach((marker, index) => {
+      markers.forEach((marker, index) => {
         if (index > 0 && previousPosition) {
           const [prevLat, prevLng] = previousPosition
           const [currLat, currLng] = marker.position
@@ -201,13 +192,11 @@ export default function Map({
       setMapStats({
         totalDistance: parseFloat(totalDistance.toFixed(2)),
         averageSpeed: parseFloat(averageSpeed.toFixed(2)),
-        markersCount: safeMarkers.length
+        markersCount: markers.length
       })
 
-      // Create a set of current marker IDs for efficient lookup
-      const currentMarkerIds = new Set(safeMarkers.map(m => m.id))
+      const currentMarkerIds = new Set(markers.map(m => m.id))
 
-      // Remove markers that are no longer in the current markers array
       markersRef.current.forEach((marker, markerId) => {
         if (!currentMarkerIds.has(markerId)) {
           try {
@@ -222,19 +211,16 @@ export default function Map({
         }
       })
 
-      // Add or update markers
-      safeMarkers.forEach(markerData => {
+      markers.forEach(markerData => {
         if (!mapInstanceRef.current) return
         
         const existingMarker = markersRef.current.get(markerData.id)
         
         if (existingMarker) {
-          // Update existing marker position
           try {
             existingMarker.setLatLng(markerData.position)
           } catch (error) {
             console.warn('Error updating marker position:', error)
-            // If update fails, remove and recreate the marker
             try {
               existingMarker.remove()
               markersRef.current.delete(markerData.id)
@@ -244,7 +230,6 @@ export default function Map({
             }
           }
         } else {
-          // Create new marker
           try {
             const truckIcon = createTruckIcon(markerData.driverName)
             const marker = L.marker(markerData.position, { icon: truckIcon }).addTo(mapInstanceRef.current)
@@ -298,14 +283,12 @@ export default function Map({
         }
       })
 
-      // Fit map to show all markers if there are any
-      if (safeMarkers.length > 0) {
+      if (markers.length > 0) {
         try {
-          const bounds = L.latLngBounds(safeMarkers.map(m => m.position))
+          const bounds = L.latLngBounds(markers.map(m => m.position))
           mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] })
         } catch (error) {
           console.warn('Error fitting bounds:', error)
-          // Set default view if bounds fitting fails
           try {
             mapInstanceRef.current.setView(center, zoom)
           } catch (viewError) {
@@ -313,7 +296,6 @@ export default function Map({
           }
         }
       } else {
-        // Set default view if no markers
         try {
           mapInstanceRef.current.setView(center, zoom)
         } catch (error) {
@@ -325,9 +307,6 @@ export default function Map({
     }
   }, [markers, center, zoom, isMapInitialized])
 
-  // Ensure markers is always an array for rendering
-  const safeMarkers = Array.isArray(markers) ? markers : []
-
   return (
     <div className="flex flex-col h-full">
       <div 
@@ -336,7 +315,7 @@ export default function Map({
         style={{ minHeight: '300px' }}
       />
       
-      {showStats && safeMarkers.length > 0 && (
+      {showStats && markers.length > 0 && (
         <div className="bg-gray-50 p-3 border-t">
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div className="text-center">
