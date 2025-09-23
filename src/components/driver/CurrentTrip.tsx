@@ -225,26 +225,66 @@ export function CurrentTrip({ trip, onComplete }: CurrentTripProps) {
   const sendLocationDetailsToAdmin = async () => {
     setUpdating(true)
     try {
+      // Get current location immediately when button is clicked
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 60000 // Allow slightly stale position (1 minute)
+        })
+      })
+
+      const { latitude, longitude } = position.coords
+      const newLocation = { lat: latitude, lng: longitude }
+      
+      // Calculate distance traveled if we have a previous location
+      let newDistance = distanceTraveled
+      if (lastPosition) {
+        const additionalDistance = calculateDistance(
+          lastPosition.coords.latitude,
+          lastPosition.coords.longitude,
+          latitude,
+          longitude
+        )
+        newDistance = distanceTraveled + additionalDistance
+        
+        // Calculate speed
+        const calculatedSpeed = calculateSpeed(lastPosition, position)
+        setSpeed(calculatedSpeed)
+      }
+      
       // Update trip with all details
       const { error } = await supabase
         .from('trips')
         .update({ 
-          current_lat: currentLocation?.lat,
-          current_lng: currentLocation?.lng,
-          distance: distanceTraveled,
+          current_lat: latitude,
+          current_lng: longitude,
+          distance: newDistance,
           updated_at: new Date().toISOString()
         })
         .eq('id', trip.id)
 
       if (error) throw error
       
+      // Update local state
+      setCurrentLocation(newLocation)
+      setDistanceTraveled(newDistance)
+      setLastPosition(position)
+      
       // Show toast with all details
       toast.success('Location details sent to admin', {
-        description: `Lat: ${currentLocation?.lat.toFixed(6)}, Lng: ${currentLocation?.lng.toFixed(6)}, Speed: ${speed.toFixed(2)} km/h, Distance: ${distanceTraveled.toFixed(2)} km`
+        description: `Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}, Speed: ${speed.toFixed(2)} km/h, Distance: ${newDistance.toFixed(2)} km`
       })
     } catch (error: any) {
       console.error('Error sending location details:', error)
       toast.error('Error sending location details: ' + (error.message || 'Unknown error'))
+      
+      // Fallback to last known location if available
+      if (currentLocation) {
+        toast.info('Using last known location', {
+          description: `Lat: ${currentLocation.lat.toFixed(6)}, Lng: ${currentLocation.lng.toFixed(6)}, Distance: ${distanceTraveled.toFixed(2)} km`
+        })
+      }
     } finally {
       setUpdating(false)
     }
