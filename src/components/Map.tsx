@@ -79,7 +79,7 @@ const createTruckIcon = (driverName: string = 'Driver') => {
 export default function Map({ markers = [], center = [0, 0], zoom = 2, className = '', showStats = true }: MapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
-  const markersRef = useRef<L.Marker[]>([])
+  const markersRef = useRef<Map<string, L.Marker>>(new Map())
   const [mapStats, setMapStats] = useState<{
     totalDistance: number
     averageSpeed: number
@@ -89,35 +89,47 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
     averageSpeed: 0,
     markersCount: 0
   })
+  const [isMapInitialized, setIsMapInitialized] = useState(false)
 
+  // Initialize map only once
   useEffect(() => {
-    if (!mapRef.current) return
+    if (!mapRef.current || isMapInitialized) return
 
     // Clean up any existing map instance
     if (mapInstanceRef.current) {
-      mapInstanceRef.current.remove()
+      try {
+        mapInstanceRef.current.remove()
+      } catch (error) {
+        console.warn('Error removing existing map:', error)
+      }
       mapInstanceRef.current = null
     }
 
     // Initialize map
-    const map = L.map(mapRef.current, {
-      center: center,
-      zoom: zoom,
-      zoomControl: true,
-      attributionControl: true
-    })
-    
-    mapInstanceRef.current = map
+    try {
+      const map = L.map(mapRef.current, {
+        center: center,
+        zoom: zoom,
+        zoomControl: true,
+        attributionControl: true
+      })
+      
+      mapInstanceRef.current = map
+      setIsMapInitialized(true)
 
-    // Add tile layer with proper attribution
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-      detectRetina: true
-    }).addTo(map)
+      // Add tile layer with proper attribution
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+        detectRetina: true
+      }).addTo(map)
 
-    // Add scale control
-    L.control.scale({ imperial: false, metric: true }).addTo(map)
+      // Add scale control
+      L.control.scale({ imperial: false, metric: true }).addTo(map)
+
+    } catch (error) {
+      console.error('Error initializing map:', error)
+    }
 
     // Cleanup function
     return () => {
@@ -125,11 +137,15 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
         try {
           // Remove all markers first
           markersRef.current.forEach(marker => {
-            if (mapInstanceRef.current) {
-              marker.remove()
+            try {
+              if (mapInstanceRef.current && marker) {
+                marker.remove()
+              }
+            } catch (error) {
+              console.warn('Error removing marker during cleanup:', error)
             }
           })
-          markersRef.current = []
+          markersRef.current.clear()
           
           // Then remove the map
           mapInstanceRef.current.remove()
@@ -137,12 +153,14 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
           console.warn('Error cleaning up map:', error)
         }
         mapInstanceRef.current = null
+        setIsMapInitialized(false)
       }
     }
-  }, [center, zoom])
+  }, [center, zoom, isMapInitialized])
 
+  // Update markers when markers array changes
   useEffect(() => {
-    if (!mapInstanceRef.current) return
+    if (!mapInstanceRef.current || !isMapInitialized) return
 
     try {
       // Calculate distance and speed statistics
@@ -177,72 +195,97 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
         markersCount: markers.length
       })
 
-      // Clear existing markers
-      markersRef.current.forEach(marker => {
-        if (mapInstanceRef.current) {
+      // Create a set of current marker IDs for efficient lookup
+      const currentMarkerIds = new Set(markers.map(m => m.id))
+
+      // Remove markers that are no longer in the current markers array
+      markersRef.current.forEach((marker, markerId) => {
+        if (!currentMarkerIds.has(markerId)) {
           try {
-            marker.remove()
+            if (mapInstanceRef.current && marker) {
+              marker.remove()
+            }
+            markersRef.current.delete(markerId)
           } catch (error) {
-            console.warn('Error removing marker:', error)
+            console.warn('Error removing old marker:', error)
+            markersRef.current.delete(markerId)
           }
         }
       })
-      markersRef.current = []
 
-      // Add new markers with custom truck icons
+      // Add or update markers
       markers.forEach(markerData => {
         if (!mapInstanceRef.current) return
         
-        const truckIcon = createTruckIcon(markerData.driverName)
-
-        try {
-          const marker = L.marker(markerData.position, { icon: truckIcon }).addTo(mapInstanceRef.current!)
-          
-          if (markerData.popupContent) {
-            marker.bindPopup(() => {
-              const div = document.createElement('div')
-              div.innerHTML = `
-                <div class="p-3 min-w-[250px]">
-                  <div class="flex items-center justify-between mb-2">
-                    <h3 class="font-bold text-sm">${markerData.driverName || 'Driver'}</h3>
-                    <div class="flex items-center text-xs text-green-600">
-                      <div class="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-                      Active
-                    </div>
-                  </div>
-                  
-                  <div class="space-y-2 text-xs">
-                    <div class="flex items-center">
-                      <svg class="h-3 w-3 mr-1 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                        <circle cx="12" cy="10" r="3" />
-                      </svg>
-                      <span class="font-medium">Location:</span>
-                      <span class="ml-1">${markerData.position[0].toFixed(6)}, ${markerData.position[1].toFixed(6)}</span>
+        const existingMarker = markersRef.current.get(markerData.id)
+        
+        if (existingMarker) {
+          // Update existing marker position
+          try {
+            existingMarker.setLatLng(markerData.position)
+          } catch (error) {
+            console.warn('Error updating marker position:', error)
+            // If update fails, remove and recreate the marker
+            try {
+              existingMarker.remove()
+              markersRef.current.delete(markerData.id)
+            } catch (removeError) {
+              console.warn('Error removing problematic marker:', removeError)
+              markersRef.current.delete(markerData.id)
+            }
+          }
+        } else {
+          // Create new marker
+          try {
+            const truckIcon = createTruckIcon(markerData.driverName)
+            const marker = L.marker(markerData.position, { icon: truckIcon }).addTo(mapInstanceRef.current)
+            
+            if (markerData.popupContent) {
+              marker.bindPopup(() => {
+                const div = document.createElement('div')
+                div.innerHTML = `
+                  <div class="p-3 min-w-[250px]">
+                    <div class="flex items-center justify-between mb-2">
+                      <h3 class="font-bold text-sm">${markerData.driverName || 'Driver'}</h3>
+                      <div class="flex items-center text-xs text-green-600">
+                        <div class="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                        Active
+                      </div>
                     </div>
                     
-                    ${markerData.vehicle ? `
-                    <div class="flex items-center">
-                      <svg class="h-3 w-3 mr-1 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M10 17h4V5H9v12h1zm7 0h3v-3.5M14 5h6l3 3v9h-3" />
-                        <circle cx="7" cy="17" r="2" />
-                        <circle cx="17" cy="17" r="2" />
-                      </svg>
-                      <span class="font-medium">Vehicle:</span>
-                      <span class="ml-1">${markerData.vehicle}</span>
-                      ${markerData.licensePlate ? `<span class="ml-2 text-gray-400">(${markerData.licensePlate})</span>` : ''}
+                    <div class="space-y-2 text-xs">
+                      <div class="flex items-center">
+                        <svg class="h-3 w-3 mr-1 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                          <circle cx="12" cy="10" r="3" />
+                        </svg>
+                        <span class="font-medium">Location:</span>
+                        <span class="ml-1">${markerData.position[0].toFixed(6)}, ${markerData.position[1].toFixed(6)}</span>
+                      </div>
+                      
+                      ${markerData.vehicle ? `
+                      <div class="flex items-center">
+                        <svg class="h-3 w-3 mr-1 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                          <path d="M10 17h4V5H9v12h1zm7 0h3v-3.5M14 5h6l3 3v9h-3" />
+                          <circle cx="7" cy="17" r="2" />
+                          <circle cx="17" cy="17" r="2" />
+                        </svg>
+                        <span class="font-medium">Vehicle:</span>
+                        <span class="ml-1">${markerData.vehicle}</span>
+                        ${markerData.licensePlate ? `<span class="ml-2 text-gray-400">(${markerData.licensePlate})</span>` : ''}
+                      </div>
+                      ` : ''}
                     </div>
-                    ` : ''}
                   </div>
-                </div>
-              `
-              return div
-            })
+                `
+                return div
+              })
+            }
+            
+            markersRef.current.set(markerData.id, marker)
+          } catch (error) {
+            console.warn('Error adding new marker:', error)
           }
-          
-          markersRef.current.push(marker)
-        } catch (error) {
-          console.warn('Error adding marker:', error)
         }
       })
 
@@ -254,16 +297,24 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
         } catch (error) {
           console.warn('Error fitting bounds:', error)
           // Set default view if bounds fitting fails
-          mapInstanceRef.current.setView(center, zoom)
+          try {
+            mapInstanceRef.current.setView(center, zoom)
+          } catch (viewError) {
+            console.warn('Error setting map view:', viewError)
+          }
         }
       } else {
         // Set default view if no markers
-        mapInstanceRef.current.setView(center, zoom)
+        try {
+          mapInstanceRef.current.setView(center, zoom)
+        } catch (error) {
+          console.warn('Error setting default view:', error)
+        }
       }
     } catch (error) {
       console.error('Error updating map markers:', error)
     }
-  }, [markers, center, zoom])
+  }, [markers, center, zoom, isMapInitialized])
 
   return (
     <div className="flex flex-col h-full">
