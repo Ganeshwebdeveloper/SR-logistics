@@ -76,7 +76,13 @@ const createTruckIcon = (driverName: string = 'Driver') => {
   })
 }
 
-export default function Map({ markers = [], center = [0, 0], zoom = 2, className = '', showStats = true }: MapProps) {
+export default function Map({ 
+  markers = [], 
+  center = [0, 0], 
+  zoom = 2, 
+  className = '', 
+  showStats = true 
+}: MapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
   const markersRef = useRef<Map<string, L.Marker>>(new Map())
@@ -162,6 +168,9 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
   useEffect(() => {
     if (!mapInstanceRef.current || !isMapInitialized) return
 
+    // Ensure markers is an array
+    const safeMarkers = Array.isArray(markers) ? markers : []
+
     try {
       // Calculate distance and speed statistics
       let totalDistance = 0
@@ -169,7 +178,7 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
       let previousPosition: [number, number] | null = null
       let previousTime: number | null = null
 
-      markers.forEach((marker, index) => {
+      safeMarkers.forEach((marker, index) => {
         if (index > 0 && previousPosition) {
           const [prevLat, prevLng] = previousPosition
           const [currLat, currLng] = marker.position
@@ -192,11 +201,11 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
       setMapStats({
         totalDistance: parseFloat(totalDistance.toFixed(2)),
         averageSpeed: parseFloat(averageSpeed.toFixed(2)),
-        markersCount: markers.length
+        markersCount: safeMarkers.length
       })
 
       // Create a set of current marker IDs for efficient lookup
-      const currentMarkerIds = new Set(markers.map(m => m.id))
+      const currentMarkerIds = new Set(safeMarkers.map(m => m.id))
 
       // Remove markers that are no longer in the current markers array
       markersRef.current.forEach((marker, markerId) => {
@@ -214,7 +223,7 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
       })
 
       // Add or update markers
-      markers.forEach(markerData => {
+      safeMarkers.forEach(markerData => {
         if (!mapInstanceRef.current) return
         
         const existingMarker = markersRef.current.get(markerData.id)
@@ -290,9 +299,9 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
       })
 
       // Fit map to show all markers if there are any
-      if (markers.length > 0) {
+      if (safeMarkers.length > 0) {
         try {
-          const bounds = L.latLngBounds(markers.map(m => m.position))
+          const bounds = L.latLngBounds(safeMarkers.map(m => m.position))
           mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] })
         } catch (error) {
           console.warn('Error fitting bounds:', error)
@@ -316,6 +325,9 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
     }
   }, [markers, center, zoom, isMapInitialized])
 
+  // Ensure markers is always an array for rendering
+  const safeMarkers = Array.isArray(markers) ? markers : []
+
   return (
     <div className="flex flex-col h-full">
       <div 
@@ -324,7 +336,7 @@ export default function Map({ markers = [], center = [0, 0], zoom = 2, className
         style={{ minHeight: '300px' }}
       />
       
-      {showStats && markers.length > 0 && (
+      {showStats && safeMarkers.length > 0 && (
         <div className="bg-gray-50 p-3 border-t">
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div className="text-center">
